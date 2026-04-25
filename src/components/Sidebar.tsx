@@ -1,14 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type {
+  DocumentItem,
   NodeType,
   ProjectTree,
   SeriesItem,
   StoryItem,
   UniverseItem,
 } from "@/types/project-tree";
+import {
+  DOCUMENT_SECTION_LABELS,
+  DOCUMENT_TYPE_LABELS,
+  DOCUMENT_TYPE_ORDER,
+  type DocumentTypeValue,
+} from "@/lib/documents";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -153,6 +160,23 @@ function SettingsIcon({ className }: { className?: string }) {
   );
 }
 
+function FileIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M3 2h7l3 3v9H3V2z" />
+      <path d="M10 2v3h3" />
+      <path d="M5.5 7h5M5.5 9.5h5M5.5 12h3" />
+    </svg>
+  );
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface ContextMenuState {
@@ -176,6 +200,11 @@ interface CreateData {
   rating: string;
   universeId?: string;
   seriesId?: string;
+}
+
+interface NewDocumentState {
+  storyId: string;
+  storyName: string;
 }
 
 // ── Context Menu ──────────────────────────────────────────────────────────────
@@ -326,8 +355,17 @@ function DeleteModal({
           Delete {modal.type}?
         </h2>
         <p className="mb-6 text-sm text-text-muted">
-          &ldquo;{modal.name}&rdquo; will be permanently deleted. Children
-          (series, stories) will be orphaned, not deleted.
+          {modal.type === "document" ? (
+            <>
+              &ldquo;{modal.name}&rdquo; will be permanently deleted along with
+              its versions and chat history.
+            </>
+          ) : (
+            <>
+              &ldquo;{modal.name}&rdquo; will be permanently deleted. Children
+              (series, stories) will be orphaned, not deleted.
+            </>
+          )}
         </p>
         <div className="flex justify-end gap-2">
           <button
@@ -551,6 +589,104 @@ function NewProjectModal({
   );
 }
 
+// ── New Document Modal ────────────────────────────────────────────────────────
+
+function NewDocumentModal({
+  storyId,
+  storyName,
+  onConfirm,
+  onClose,
+}: {
+  storyId: string;
+  storyName: string;
+  onConfirm: (type: DocumentTypeValue, name: string) => void;
+  onClose: () => void;
+}) {
+  const [docType, setDocType] = useState<DocumentTypeValue>("CHARACTER");
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const submit = () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setSaving(true);
+    onConfirm(docType, trimmed);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm rounded-lg border border-border bg-surface p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+        data-testid="new-document-modal"
+      >
+        <h2 className="mb-1 font-heading text-lg font-semibold text-text-primary">
+          New Document
+        </h2>
+        <p className="mb-4 text-xs text-text-muted">In: {storyName}</p>
+
+        <fieldset className="mb-4">
+          <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-text-muted">
+            Type
+          </legend>
+          <div className="grid grid-cols-3 gap-1.5">
+            {DOCUMENT_TYPE_ORDER.map((type) => (
+              <button
+                key={type}
+                onClick={() => setDocType(type)}
+                className={`rounded border px-2 py-1.5 text-xs transition-colors ${
+                  docType === type
+                    ? "border-accent bg-accent text-white"
+                    : "border-border text-text-muted hover:border-accent hover:text-text-primary"
+                }`}
+              >
+                {DOCUMENT_TYPE_LABELS[type]}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
+        <div className="mb-6">
+          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-text-muted">
+            Name
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submit();
+              if (e.key === "Escape") onClose();
+            }}
+            autoFocus
+            className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-accent"
+            aria-label="Document name"
+          />
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="rounded border border-border px-4 py-2 text-sm text-text-muted hover:bg-background"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={saving || !name.trim()}
+            className="rounded bg-accent px-4 py-2 text-sm text-white hover:bg-accent-hover disabled:opacity-50"
+          >
+            {saving ? "Creating…" : "Create"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 
 interface SidebarProps {
@@ -567,6 +703,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const [renameModal, setRenameModal] = useState<ModalState | null>(null);
   const [deleteModal, setDeleteModal] = useState<ModalState | null>(null);
   const [newProjectModal, setNewProjectModal] = useState(false);
+  const [newDocumentModal, setNewDocumentModal] = useState<NewDocumentState | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem("sidebar-collapsed");
@@ -642,6 +779,20 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     fetchTree();
   };
 
+  const handleDocumentCreate = async (
+    storyId: string,
+    type: DocumentTypeValue,
+    name: string,
+  ) => {
+    await fetch("/api/documents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, name, storyId }),
+    });
+    setNewDocumentModal(null);
+    fetchTree();
+  };
+
   const handleCreate = async (data: CreateData) => {
     const endpoint = `/api/${data.itemType}s`;
     const body: Record<string, unknown> = {
@@ -667,33 +818,31 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
   // ── Tree node renderers ────────────────────────────────────────────────────
 
-  const renderStoryNode = (story: StoryItem, depth: number) => (
-    <li key={story.id}>
+  const renderDocumentNode = (doc: DocumentItem, depth: number) => (
+    <li key={doc.id}>
       <div
         className={`group flex items-center gap-1.5 rounded px-2 py-1.5 text-sm transition-colors ${
-          activeId === story.id
+          activeId === doc.id
             ? "bg-accent/10 text-accent"
             : "text-text-primary hover:bg-background"
         }`}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
       >
         <button
-          onClick={() => setActiveId(story.id)}
+          onClick={() => setActiveId(doc.id)}
           className="flex flex-1 items-center gap-1.5 truncate"
-          data-testid={`story-node-${story.id}`}
-          aria-label={story.name}
+          data-testid={`document-node-${doc.id}`}
+          aria-label={doc.name}
         >
-          <BookIcon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
-          {!collapsed && (
-            <span className="truncate">{story.name}</span>
-          )}
+          <FileIcon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
+          {!collapsed && <span className="truncate">{doc.name}</span>}
         </button>
         {!collapsed && (
           <button
-            onClick={(e) => openContextMenu(e, story.id, "story", story.name)}
+            onClick={(e) => openContextMenu(e, doc.id, "document", doc.name)}
             className="invisible shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:visible"
-            aria-label={`Options for ${story.name}`}
-            data-testid={`story-menu-${story.id}`}
+            aria-label={`Options for ${doc.name}`}
+            data-testid={`document-menu-${doc.id}`}
           >
             <DotsIcon className="h-3.5 w-3.5" />
           </button>
@@ -701,6 +850,96 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       </div>
     </li>
   );
+
+  const renderDocumentSections = (documents: DocumentItem[], depth: number) =>
+    DOCUMENT_TYPE_ORDER.flatMap((type) => {
+      const docs = documents
+        .filter((d) => d.type === type)
+        .sort((a, b) => {
+          if (a.order !== null && b.order !== null) return a.order - b.order;
+          if (a.order !== null) return -1;
+          if (b.order !== null) return 1;
+          return 0;
+        });
+      if (docs.length === 0) return [];
+
+      return [
+        <li key={`section-${type}`}>
+          <div
+            className="px-2 pb-0.5 pt-2 text-xs font-medium uppercase tracking-wide text-text-muted"
+            style={{ paddingLeft: `${depth * 12 + 8}px` }}
+          >
+            {DOCUMENT_SECTION_LABELS[type]}
+          </div>
+        </li>,
+        ...docs.map((doc) => renderDocumentNode(doc, depth)),
+      ];
+    });
+
+  const renderStoryNode = (story: StoryItem, depth: number) => {
+    const isExpanded = expanded.has(story.id);
+    const hasDocuments = story.documents.length > 0;
+
+    return (
+      <li key={story.id}>
+        <div
+          className={`group flex items-center gap-1 rounded px-2 py-1.5 text-sm transition-colors ${
+            activeId === story.id
+              ? "bg-accent/10 text-accent"
+              : "text-text-primary hover:bg-background"
+          }`}
+          style={{ paddingLeft: `${depth * 12 + 8}px` }}
+        >
+          {hasDocuments ? (
+            <button
+              onClick={() => toggleExpanded(story.id)}
+              className="shrink-0 text-text-muted"
+              aria-label={isExpanded ? "Collapse" : "Expand"}
+            >
+              <ChevronIcon expanded={isExpanded} className="h-3 w-3" />
+            </button>
+          ) : (
+            <span className="h-3 w-3 shrink-0" />
+          )}
+          <button
+            onClick={() => setActiveId(story.id)}
+            className="flex flex-1 items-center gap-1.5 truncate"
+            data-testid={`story-node-${story.id}`}
+            aria-label={story.name}
+          >
+            <BookIcon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
+            {!collapsed && <span className="truncate">{story.name}</span>}
+          </button>
+          {!collapsed && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setNewDocumentModal({ storyId: story.id, storyName: story.name });
+                }}
+                className="invisible shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:visible"
+                aria-label={`Add document to ${story.name}`}
+                data-testid={`story-add-doc-${story.id}`}
+              >
+                <PlusIcon className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={(e) => openContextMenu(e, story.id, "story", story.name)}
+                className="invisible shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:visible"
+                aria-label={`Options for ${story.name}`}
+                data-testid={`story-menu-${story.id}`}
+              >
+                <DotsIcon className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
+        </div>
+        {isExpanded && hasDocuments && (
+          <ul>{renderDocumentSections(story.documents, depth + 1)}</ul>
+        )}
+      </li>
+    );
+  };
 
   const renderSeriesNode = (series: SeriesItem, depth: number) => {
     const isExpanded = expanded.has(series.id);
@@ -982,6 +1221,18 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           tree={tree}
           onConfirm={handleCreate}
           onClose={() => setNewProjectModal(false)}
+        />
+      )}
+
+      {/* New document modal */}
+      {newDocumentModal !== null && (
+        <NewDocumentModal
+          storyId={newDocumentModal.storyId}
+          storyName={newDocumentModal.storyName}
+          onConfirm={(type, name) =>
+            handleDocumentCreate(newDocumentModal.storyId, type, name)
+          }
+          onClose={() => setNewDocumentModal(null)}
         />
       )}
     </>

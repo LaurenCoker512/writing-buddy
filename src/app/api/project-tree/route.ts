@@ -10,16 +10,32 @@ export async function GET() {
 
   const userId = session.user.id;
 
+  const storyDocumentInclude = {
+    documents: {
+      select: { id: true, name: true, type: true, order: true },
+      orderBy: [
+        { order: "asc" as const },
+        { createdAt: "asc" as const },
+      ],
+    },
+  };
+
   const [universes, standaloneSeries, standaloneStories] = await Promise.all([
     prisma.universe.findMany({
       where: { userId },
       include: {
         series: {
-          include: { stories: { orderBy: { createdAt: "asc" } } },
+          include: {
+            stories: {
+              include: storyDocumentInclude,
+              orderBy: { createdAt: "asc" },
+            },
+          },
           orderBy: { createdAt: "asc" },
         },
         stories: {
           where: { seriesId: null },
+          include: storyDocumentInclude,
           orderBy: { createdAt: "asc" },
         },
       },
@@ -27,11 +43,17 @@ export async function GET() {
     }),
     prisma.series.findMany({
       where: { userId, universeId: null },
-      include: { stories: { orderBy: { createdAt: "asc" } } },
+      include: {
+        stories: {
+          include: storyDocumentInclude,
+          orderBy: { createdAt: "asc" },
+        },
+      },
       orderBy: { createdAt: "asc" },
     }),
     prisma.story.findMany({
       where: { userId, seriesId: null, universeId: null },
+      include: storyDocumentInclude,
       orderBy: { createdAt: "asc" },
     }),
   ]);

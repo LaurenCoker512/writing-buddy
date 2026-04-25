@@ -102,7 +102,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 5: Project Hierarchy — Sidebar UI ☐
+## Phase 5: Project Hierarchy — Sidebar UI ✅
 
 **Goal:** A collapsible, responsive sidebar showing the user's full project tree.
 
@@ -127,7 +127,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 6: Document CRUD & Sidebar Entries ☐
+## Phase 6: Document CRUD & Sidebar Entries ✅
 
 **Goal:** Documents can be created, renamed, deleted, and reordered, and appear in the sidebar grouped by section.
 

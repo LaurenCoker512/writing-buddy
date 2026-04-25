@@ -1,8 +1,16 @@
+export interface DocumentItem {
+  id: string;
+  name: string;
+  type: string;
+  order: number | null;
+}
+
 export interface StoryItem {
   id: string;
   name: string;
   mode: string;
   rating: string;
+  documents: DocumentItem[];
 }
 
 export interface SeriesItem {
@@ -28,4 +36,4 @@ export interface ProjectTree {
   standaloneStories: StoryItem[];
 }
 
-export type NodeType = "universe" | "series" | "story";
+export type NodeType = "universe" | "series" | "story" | "document";
