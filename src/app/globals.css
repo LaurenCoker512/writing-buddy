@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-lora: "Lora", Georgia, serif;
+  --font-inter: "Inter", system-ui, sans-serif;
+}
+
+body {
+  background-color: #FAF7F2;
+  color: #1C1A17;
+  font-family: var(--font-inter);
+}
