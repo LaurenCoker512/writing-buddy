@@ -1,0 +1,95 @@
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { isMode, isRating, toOptionalString } from "@/lib/hierarchy";
+
+type Params = { params: { id: string } };
+
+export async function GET(_req: NextRequest, { params }: Params) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const universe = await prisma.universe.findFirst({
+    where: { id: params.id, userId: session.user.id },
+  });
+
+  if (!universe) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  return NextResponse.json(universe);
+}
+
+export async function PATCH(req: NextRequest, { params }: Params) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const existing = await prisma.universe.findFirst({
+    where: { id: params.id, userId: session.user.id },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const body = (await req.json()) as Record<string, unknown>;
+  const data: {
+    name?: string;
+    mode?: "ORIGINAL" | "FANFIC";
+    rating?: "G" | "T" | "M" | "E";
+    sourceTitle?: string | null;
+  } = {};
+
+  if (typeof body.name === "string" && body.name.trim() !== "") {
+    data.name = body.name.trim();
+  }
+  if (body.mode !== undefined) {
+    if (!isMode(body.mode)) {
+      return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
+    }
+    data.mode = body.mode;
+  }
+  if (body.rating !== undefined) {
+    if (!isRating(body.rating)) {
+      return NextResponse.json({ error: "Invalid rating" }, { status: 400 });
+    }
+    data.rating = body.rating;
+  }
+  if (body.sourceTitle !== undefined) {
+    data.sourceTitle = toOptionalString(body.sourceTitle);
+  }
+
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+  }
+
+  const updated = await prisma.universe.update({
+    where: { id: params.id },
+    data,
+  });
+
+  return NextResponse.json(updated);
+}
+
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const existing = await prisma.universe.findFirst({
+    where: { id: params.id, userId: session.user.id },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // onDelete: SetNull on Series.universeId and Story.universeId means
+  // related series and stories are orphaned (not deleted) by the DB.
+  await prisma.universe.delete({ where: { id: params.id } });
+
+  return new NextResponse(null, { status: 204 });
+}

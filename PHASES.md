@@ -53,7 +53,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 3: Settings & Account Management ☐
+## Phase 3: Settings & Account Management ✅
 
 **Goal:** Users can manage their OpenRouter API key and delete their account.
 
@@ -76,7 +76,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 4: Project Hierarchy — API ☐
+## Phase 4: Project Hierarchy — API ✅
 
 **Goal:** Full CRUD API for the Universe → Series → Story hierarchy with correct cascade behavior.
 
