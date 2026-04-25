@@ -4,7 +4,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 1: Project Scaffold
+## Phase 1: Project Scaffold ✅
 
 **Goal:** A deployable Next.js app with a complete Prisma schema, no auth or features yet.
 
@@ -23,7 +23,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 2: Authentication
+## Phase 2: Authentication ✅
 
 **Goal:** Users can register, sign in, and be redirected away from protected routes.
 
@@ -53,7 +53,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 3: Settings & Account Management
+## Phase 3: Settings & Account Management ☐
 
 **Goal:** Users can manage their OpenRouter API key and delete their account.
 
@@ -76,7 +76,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 4: Project Hierarchy — API
+## Phase 4: Project Hierarchy — API ☐
 
 **Goal:** Full CRUD API for the Universe → Series → Story hierarchy with correct cascade behavior.
 
@@ -102,7 +102,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 5: Project Hierarchy — Sidebar UI
+## Phase 5: Project Hierarchy — Sidebar UI ☐
 
 **Goal:** A collapsible, responsive sidebar showing the user's full project tree.
 
@@ -127,7 +127,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 6: Document CRUD & Sidebar Entries
+## Phase 6: Document CRUD & Sidebar Entries ☐
 
 **Goal:** Documents can be created, renamed, deleted, and reordered, and appear in the sidebar grouped by section.
 
@@ -151,7 +151,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 7: TipTap Editor & Autosave
+## Phase 7: TipTap Editor & Autosave ☐
 
 **Goal:** A fully featured rich-text editor with silent autosave.
 
@@ -174,7 +174,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 8: Split-View Layout
+## Phase 8: Split-View Layout ☐
 
 **Goal:** The workspace uses a two-panel split-view with a draggable divider and responsive stacking.
 
@@ -193,7 +193,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 9: Document Export
+## Phase 9: Document Export ☐
 
 **Goal:** Individual documents and whole projects can be exported in multiple formats.
 
@@ -217,7 +217,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 10: AI Chat — Core
+## Phase 10: AI Chat — Core ☐
 
 **Goal:** A working AI chat panel with streaming responses backed by OpenRouter.
 
@@ -248,7 +248,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 11: Chat Persistence & Pruning
+## Phase 11: Chat Persistence & Pruning ☐
 
 **Goal:** Chat history is persisted per document and automatically pruned with a rolling summary.
 
@@ -275,7 +275,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 12: AI Diff Proposals
+## Phase 12: AI Diff Proposals ☐
 
 **Goal:** The AI can propose section-level edits displayed as accept/reject diff cards.
 
@@ -305,7 +305,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 13: AI Context — Tier 2
+## Phase 13: AI Context — Tier 2 ☐
 
 **Goal:** The AI receives richer context from sibling documents via cached summaries within a token budget.
 
@@ -326,7 +326,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 14: Version History
+## Phase 14: Version History ☐
 
 **Goal:** A slide-over version history panel lets writers preview and restore prior document states.
 
@@ -354,7 +354,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 15: Document Type Templates
+## Phase 15: Document Type Templates ☐
 
 **Goal:** New documents open with type-specific starter headings and structured metadata fields.
 
@@ -383,7 +383,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 16: Scene Ordering & Document Specialization
+## Phase 16: Scene Ordering & Document Specialization ☐
 
 **Goal:** Scenes can be drag-reordered in the sidebar, and story-level documents can be linked to Universe-level parents.
 
@@ -405,7 +405,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 17: Relationship Map
+## Phase 17: Relationship Map ☐
 
 **Goal:** An interactive graph of characters and relationships, navigable and scoped per story or universe.
 
@@ -440,7 +440,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 18: Brainstorm — Logline Generation
+## Phase 18: Brainstorm — Logline Generation ☐
 
 **Goal:** Writers can generate batches of story loglines from a free-text seed and mode selection.
 
@@ -469,7 +469,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 19: Saved Prompts & Convert to Story
+## Phase 19: Saved Prompts & Convert to Story ☐
 
 **Goal:** Loglines can be saved to a persistent library and converted into full story projects.
 
@@ -499,7 +499,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 20: Fanfic Mode — Core
+## Phase 20: Fanfic Mode — Core ☐
 
 **Goal:** Projects can be created in Fanfic mode with canon text ingested and tagged.
 
@@ -526,7 +526,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 21: Fanfic Mode — AI Integration & AU Variants
+## Phase 21: Fanfic Mode — AI Integration & AU Variants ☐
 
 **Goal:** The AI labels canon references inline and writers can create and distinguish AU variants.
 
@@ -550,7 +550,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 22: Content Rating & Explicit Unlock
+## Phase 22: Content Rating & Explicit Unlock ☐
 
 **Goal:** Project ratings are reflected in AI calibration and explicit content requires a one-time age gate.
 
@@ -580,7 +580,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 23: Contradiction Checker
+## Phase 23: Contradiction Checker ☐
 
 **Goal:** Writers can run an on-demand AI contradiction check across their Story documents with token transparency.
 
