@@ -48,6 +48,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const data: {
     name?: string;
     order?: number | null;
+    parentDocumentId?: string | null;
     tiptapJson?: Prisma.InputJsonValue;
     meta?: Prisma.InputJsonValue;
   } = {};
@@ -57,6 +58,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
   if (body.order !== undefined) {
     data.order = typeof body.order === "number" ? body.order : null;
+  }
+  if (body.parentDocumentId !== undefined) {
+    data.parentDocumentId =
+      typeof body.parentDocumentId === "string" ? body.parentDocumentId : null;
   }
   if (body.tiptapJson !== undefined && typeof body.tiptapJson === "object" && body.tiptapJson !== null) {
     data.tiptapJson = body.tiptapJson as Prisma.InputJsonValue;

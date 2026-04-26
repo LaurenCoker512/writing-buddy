@@ -12,7 +12,7 @@ export async function GET() {
 
   const storyDocumentInclude = {
     documents: {
-      select: { id: true, name: true, type: true, order: true },
+      select: { id: true, name: true, type: true, order: true, parentDocumentId: true },
       orderBy: [
         { order: "asc" as const },
         { createdAt: "asc" as const },

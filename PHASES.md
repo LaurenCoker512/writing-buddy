@@ -383,7 +383,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 16: Scene Ordering & Document Specialization ☐
+## Phase 16: Scene Ordering & Document Specialization ✅
 
 **Goal:** Scenes can be drag-reordered in the sidebar, and story-level documents can be linked to Universe-level parents.
 
@@ -603,3 +603,40 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 **E2E**
 - Trigger Contradiction Checker; verify token estimate modal; confirm; verify results modal with at least one issue
+
+---
+
+## Phase 24: Anthropic API Provider ☐
+
+**Goal:** Users can choose to supply an Anthropic API key instead of an OpenRouter key, with all AI features working identically through a unified provider adapter.
+
+### Deliverables
+
+- `lib/ai-provider.ts` — provider adapter with two implementations:
+  - `OpenRouterProvider` — wraps existing OpenRouter fetch calls
+  - `AnthropicProvider` — uses `@anthropic-ai/sdk`; maps system prompt to top-level `system` param; translates Anthropic SSE events to the shared stream format
+  - Common interface: `streamChat(messages, systemPrompt, options)` → `ReadableStream` and `completeChat(messages, systemPrompt)` → `string`
+- DB migration — add `anthropicKey` (encrypted, nullable) to `User`; add `aiProvider` enum (`OPENROUTER` | `ANTHROPIC`) defaulting to `OPENROUTER`
+- Settings page updates
+  - Provider toggle (radio or segmented control): OpenRouter / Anthropic
+  - Per-provider key entry form with correct placeholder (`sk-or-…` vs `sk-ant-…`)
+  - Selecting a provider with no saved key shows inline prompt; switching provider clears the active-provider indicator
+- API key route — `PATCH /api/settings/api-key` accepts `{ provider, apiKey }` and stores to the correct encrypted column
+- All AI routes updated to use the adapter: `POST /api/ai/chat`, `POST /api/ai/diff`, content-summary helper, brainstorm (Phase 18), contradiction-check (Phase 23)
+- `AI_CONFIG` — add `ANTHROPIC_DEFAULT_MODEL` (e.g. `claude-haiku-4-5-20251001`) alongside `OPENROUTER_DEFAULT_MODEL`
+- "No API key" nudge updated to name the active provider or prompt the user to configure one
+
+### Tests
+
+**Unit**
+- Provider adapter — `AnthropicProvider.streamChat` converts Anthropic SSE `content_block_delta` events into the same chunk format as `OpenRouterProvider`
+- Provider selection — user with `aiProvider: ANTHROPIC` and a valid `anthropicKey` resolves to `AnthropicProvider`; user with missing `anthropicKey` falls back to the 402 nudge
+
+**Integration**
+- `PATCH /api/settings/api-key` with `provider: 'ANTHROPIC'` — saves encrypted key to `anthropicKey`; does not touch `openRouterKey`
+- `POST /api/ai/chat` with mock Anthropic SDK — returns streamed SSE identical in shape to OpenRouter path
+- `POST /api/ai/chat` with `aiProvider: ANTHROPIC` and no `anthropicKey` — returns 402 with nudge payload
+
+**E2E**
+- Switch provider to Anthropic in Settings; enter a key; send a chat message; verify response streams correctly
+- Switch back to OpenRouter; verify OpenRouter key is still configured and chat works

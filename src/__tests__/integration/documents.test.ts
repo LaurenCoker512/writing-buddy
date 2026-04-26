@@ -211,6 +211,63 @@ describe("PATCH /api/documents/[id]", () => {
     expect(updateCall.data.order).toBe(1.5);
   });
 
+  test("scene reorder — PATCH updates order and scenes are returned sorted by order", async () => {
+    const reorderedDocument = { ...existingDocument, type: "SCENE", order: 1500 };
+    mockDocUpdate.mockResolvedValue(reorderedDocument);
+
+    const req = new NextRequest("http://localhost/api/documents/doc-1", {
+      method: "PATCH",
+      body: JSON.stringify({ order: 1500 }),
+      headers: { "Content-Type": "application/json" },
+    });
+    const res = await PATCH(req, PARAMS);
+    expect(res.status).toBe(200);
+
+    const updateCall = mockDocUpdate.mock.calls[0][0] as {
+      data: { order: number };
+    };
+    expect(updateCall.data.order).toBe(1500);
+
+    const body = (await res.json()) as { order: number };
+    expect(body.order).toBe(1500);
+  });
+
+  test("updates parentDocumentId and returns 200", async () => {
+    const updatedDoc = { ...existingDocument, parentDocumentId: "parent-doc-1" };
+    mockDocUpdate.mockResolvedValue(updatedDoc);
+
+    const req = new NextRequest("http://localhost/api/documents/doc-1", {
+      method: "PATCH",
+      body: JSON.stringify({ parentDocumentId: "parent-doc-1" }),
+      headers: { "Content-Type": "application/json" },
+    });
+    const res = await PATCH(req, PARAMS);
+    expect(res.status).toBe(200);
+
+    const updateCall = mockDocUpdate.mock.calls[0][0] as {
+      data: { parentDocumentId: string };
+    };
+    expect(updateCall.data.parentDocumentId).toBe("parent-doc-1");
+  });
+
+  test("clears parentDocumentId when set to null", async () => {
+    const updatedDoc = { ...existingDocument, parentDocumentId: null };
+    mockDocUpdate.mockResolvedValue(updatedDoc);
+
+    const req = new NextRequest("http://localhost/api/documents/doc-1", {
+      method: "PATCH",
+      body: JSON.stringify({ parentDocumentId: null }),
+      headers: { "Content-Type": "application/json" },
+    });
+    const res = await PATCH(req, PARAMS);
+    expect(res.status).toBe(200);
+
+    const updateCall = mockDocUpdate.mock.calls[0][0] as {
+      data: { parentDocumentId: null };
+    };
+    expect(updateCall.data.parentDocumentId).toBeNull();
+  });
+
   test("returns 400 when no valid fields provided", async () => {
     const req = new NextRequest("http://localhost/api/documents/doc-1", {
       method: "PATCH",

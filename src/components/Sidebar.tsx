@@ -3,6 +3,21 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type {
   DocumentItem,
   NodeType,
@@ -17,6 +32,7 @@ import {
   DOCUMENT_TYPE_ORDER,
   type DocumentTypeValue,
 } from "@/lib/documents";
+import { calculateInsertOrder } from "@/lib/scene-order";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -174,6 +190,19 @@ function FileIcon({ className }: { className?: string }) {
       <path d="M3 2h7l3 3v9H3V2z" />
       <path d="M10 2v3h3" />
       <path d="M5.5 7h5M5.5 9.5h5M5.5 12h3" />
+    </svg>
+  );
+}
+
+function GripIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" className={className} aria-hidden="true">
+      <circle cx="5.5" cy="4" r="1.2" />
+      <circle cx="5.5" cy="8" r="1.2" />
+      <circle cx="5.5" cy="12" r="1.2" />
+      <circle cx="10.5" cy="4" r="1.2" />
+      <circle cx="10.5" cy="8" r="1.2" />
+      <circle cx="10.5" cy="12" r="1.2" />
     </svg>
   );
 }
@@ -710,6 +739,139 @@ function NewDocumentModal({
   );
 }
 
+// ── Scene Drag-and-Drop ───────────────────────────────────────────────────────
+
+function SortableSceneItem({
+  doc,
+  depth,
+  isActive,
+  collapsed,
+  onContextMenu,
+}: {
+  doc: DocumentItem;
+  depth: number;
+  isActive: boolean;
+  collapsed: boolean;
+  onContextMenu: (e: React.MouseEvent) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: doc.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
+
+  return (
+    <li ref={setNodeRef} style={style} {...attributes}>
+      <div
+        className={`group flex items-center gap-1.5 rounded px-2 py-1.5 text-sm transition-colors ${
+          isActive
+            ? "bg-accent/10 text-accent"
+            : "text-text-primary hover:bg-background"
+        }`}
+        style={{ paddingLeft: `${depth * 12 + 8}px` }}
+      >
+        {!collapsed && (
+          <button
+            {...listeners}
+            className="shrink-0 cursor-grab text-text-muted opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing"
+            aria-label={`Drag to reorder ${doc.name}`}
+            tabIndex={-1}
+          >
+            <GripIcon className="h-3 w-3" />
+          </button>
+        )}
+        <Link
+          href={`/dashboard/documents/${doc.id}`}
+          className="flex flex-1 items-center gap-1.5 truncate"
+          data-testid={`document-node-${doc.id}`}
+          aria-label={doc.name}
+          aria-current={isActive ? "page" : undefined}
+        >
+          <FileIcon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
+          {!collapsed && <span className="truncate">{doc.name}</span>}
+        </Link>
+        {!collapsed && (
+          <button
+            onClick={onContextMenu}
+            className="invisible shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:visible"
+            aria-label={`Options for ${doc.name}`}
+            data-testid={`document-menu-${doc.id}`}
+          >
+            <DotsIcon className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function SortableSceneList({
+  docs: initialDocs,
+  depth,
+  pathname,
+  collapsed,
+  onContextMenu,
+}: {
+  docs: DocumentItem[];
+  depth: number;
+  pathname: string;
+  collapsed: boolean;
+  onContextMenu: (e: React.MouseEvent, id: string, name: string) => void;
+}) {
+  const [docs, setDocs] = useState(initialDocs);
+
+  useEffect(() => {
+    setDocs(initialDocs);
+  }, [initialDocs]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = docs.findIndex((d) => d.id === active.id);
+    const newIndex = docs.findIndex((d) => d.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(docs, oldIndex, newIndex);
+    const otherOrders = reordered
+      .filter((d) => d.id !== active.id)
+      .map((d) => d.order);
+    const newOrder = calculateInsertOrder(otherOrders, newIndex);
+
+    setDocs(reordered.map((d) => (d.id === active.id ? { ...d, order: newOrder } : d)));
+
+    void fetch(`/api/documents/${String(active.id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order: newOrder }),
+    });
+  }
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={docs.map((d) => d.id)} strategy={verticalListSortingStrategy}>
+        {docs.map((doc) => (
+          <SortableSceneItem
+            key={doc.id}
+            doc={doc}
+            depth={depth}
+            isActive={pathname === `/dashboard/documents/${doc.id}`}
+            collapsed={collapsed}
+            onContextMenu={(e) => onContextMenu(e, doc.id, doc.name)}
+          />
+        ))}
+      </SortableContext>
+    </DndContext>
+  );
+}
+
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 
 interface SidebarProps {
@@ -891,7 +1053,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         });
       if (docs.length === 0) return [];
 
-      return [
+      const sectionLabel = (
         <li key={`section-${type}`}>
           <div
             className="px-2 pb-0.5 pt-2 text-xs font-medium uppercase tracking-wide text-text-muted"
@@ -899,9 +1061,29 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           >
             {DOCUMENT_SECTION_LABELS[type]}
           </div>
-        </li>,
-        ...docs.map((doc) => renderDocumentNode(doc, depth)),
-      ];
+        </li>
+      );
+
+      if (type === "SCENE") {
+        return [
+          sectionLabel,
+          <li key={`scene-list-${docs[0]?.id ?? type}`}>
+            <ul>
+              <SortableSceneList
+                docs={docs}
+                depth={depth}
+                pathname={pathname}
+                collapsed={collapsed}
+                onContextMenu={(e, id, name) =>
+                  openContextMenu(e, id, "document", name)
+                }
+              />
+            </ul>
+          </li>,
+        ];
+      }
+
+      return [sectionLabel, ...docs.map((doc) => renderDocumentNode(doc, depth))];
     });
 
   const renderStoryNode = (story: StoryItem, depth: number) => {

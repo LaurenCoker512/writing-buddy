@@ -3,6 +3,7 @@ export interface DocumentItem {
   name: string;
   type: string;
   order: number | null;
+  parentDocumentId: string | null;
 }
 
 export interface StoryItem {

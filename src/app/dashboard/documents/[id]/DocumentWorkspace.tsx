@@ -30,6 +30,9 @@ interface DocumentWorkspaceProps {
   documentType: string;
   initialJson: object;
   initialMeta: Record<string, unknown> | null;
+  parentDocumentId: string | null;
+  parentDocumentName: string | null;
+  parentCandidates: { id: string; name: string }[];
 }
 
 export default function DocumentWorkspace({
@@ -38,6 +41,9 @@ export default function DocumentWorkspace({
   documentType,
   initialJson,
   initialMeta,
+  parentDocumentId: initialParentDocumentId,
+  parentDocumentName: initialParentDocumentName,
+  parentCandidates,
 }: DocumentWorkspaceProps) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [externalContent, setExternalContent] = useState<
@@ -45,6 +51,13 @@ export default function DocumentWorkspace({
   >();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [versionKey, setVersionKey] = useState(0);
+  const [parentDocumentId, setParentDocumentId] = useState<string | null>(
+    initialParentDocumentId,
+  );
+  const [parentDocumentName, setParentDocumentName] = useState<string | null>(
+    initialParentDocumentName,
+  );
+  const [showParentSelector, setShowParentSelector] = useState(false);
 
   const typeLabel = DOCUMENT_TYPE_LABELS[documentType as DocumentTypeValue] ?? documentType;
 
@@ -86,24 +99,107 @@ export default function DocumentWorkspace({
     setVersionKey((k) => k + 1);
   }
 
+  async function handleSetParent(candidateId: string | null) {
+    const candidate = parentCandidates.find((c) => c.id === candidateId) ?? null;
+    setParentDocumentId(candidateId);
+    setParentDocumentName(candidate?.name ?? null);
+    setShowParentSelector(false);
+    await fetch(`/api/documents/${documentId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ parentDocumentId: candidateId }),
+    });
+  }
+
   const editorPanel = (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-baseline gap-3 border-b border-border bg-surface px-6 py-4">
-        <h1 className="font-heading text-xl font-semibold text-text-primary">
-          {documentName}
-        </h1>
-        <span className="text-xs text-text-muted">{typeLabel}</span>
-        <div className="ml-auto">
-          <button
-            type="button"
-            onClick={() => setHistoryOpen(true)}
-            aria-label="View version history"
-            data-testid="version-history-button"
-            className="rounded px-2 py-1 text-sm text-text-muted transition-colors hover:bg-background hover:text-text-primary"
-          >
-            History
-          </button>
+      <div className="flex shrink-0 flex-col border-b border-border bg-surface px-6 py-4">
+        <div className="flex items-baseline gap-3">
+          <h1 className="font-heading text-xl font-semibold text-text-primary">
+            {documentName}
+          </h1>
+          <span className="text-xs text-text-muted">{typeLabel}</span>
+          <div className="ml-auto">
+            <button
+              type="button"
+              onClick={() => setHistoryOpen(true)}
+              aria-label="View version history"
+              data-testid="version-history-button"
+              className="rounded px-2 py-1 text-sm text-text-muted transition-colors hover:bg-background hover:text-text-primary"
+            >
+              History
+            </button>
+          </div>
         </div>
+        {parentCandidates.length > 0 && (
+          <div className="relative mt-1 flex items-center gap-2">
+            {parentDocumentName !== null ? (
+              <>
+                <span className="text-xs text-text-muted">
+                  Specialization of:{" "}
+                  <span className="font-medium text-text-primary">{parentDocumentName}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowParentSelector(true)}
+                  className="text-xs text-accent hover:underline"
+                  aria-label="Change parent document"
+                >
+                  Change
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetParent(null)}
+                  className="text-xs text-text-muted hover:text-text-primary hover:underline"
+                  aria-label="Remove parent document link"
+                >
+                  Remove
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowParentSelector(true)}
+                className="text-xs text-accent hover:underline"
+                aria-label="Link to universe document"
+                data-testid="link-parent-button"
+              >
+                + Link to universe document
+              </button>
+            )}
+            {showParentSelector && (
+              <div className="absolute left-0 top-6 z-20 min-w-[220px] rounded border border-border bg-surface shadow-lg">
+                <div className="p-2 text-xs font-medium text-text-muted">
+                  Select universe document
+                </div>
+                <ul>
+                  {parentCandidates.map((candidate) => (
+                    <li key={candidate.id}>
+                      <button
+                        type="button"
+                        onClick={() => handleSetParent(candidate.id)}
+                        className={`block w-full px-3 py-2 text-left text-sm hover:bg-background ${
+                          candidate.id === parentDocumentId
+                            ? "font-medium text-accent"
+                            : "text-text-primary"
+                        }`}
+                      >
+                        {candidate.name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  onClick={() => setShowParentSelector(false)}
+                  className="block w-full px-3 py-2 text-left text-xs text-text-muted hover:bg-background"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
       <DocumentMetaBar
         documentId={documentId}

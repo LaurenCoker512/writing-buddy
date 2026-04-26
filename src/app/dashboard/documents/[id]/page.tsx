@@ -12,9 +12,10 @@ export default async function DocumentPage({ params }: Props) {
   const document = await prisma.document.findFirst({
     where: { id: params.id },
     include: {
-      story: { select: { userId: true } },
-      series: { select: { userId: true } },
+      story: { select: { userId: true, universeId: true, seriesId: true } },
+      series: { select: { userId: true, universeId: true } },
       universe: { select: { userId: true } },
+      parent: { select: { id: true, name: true } },
     },
   });
 
@@ -36,6 +37,24 @@ export default async function DocumentPage({ params }: Props) {
       ? (document.meta as Record<string, unknown>)
       : null;
 
+  // Resolve the universe that owns this document (for specialization candidates)
+  const universeId =
+    document.universeId ??
+    document.story?.universeId ??
+    document.series?.universeId ??
+    null;
+
+  // Fetch universe-level documents of the same type as parent candidates,
+  // but only when the current document is story-scoped (specialization is story→universe)
+  let parentCandidates: { id: string; name: string }[] = [];
+  if (document.storyId !== null && universeId !== null) {
+    parentCandidates = await prisma.document.findMany({
+      where: { universeId, type: document.type },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+  }
+
   return (
     <DocumentWorkspace
       documentId={document.id}
@@ -43,6 +62,9 @@ export default async function DocumentPage({ params }: Props) {
       documentType={document.type}
       initialJson={tiptapJson}
       initialMeta={initialMeta}
+      parentDocumentId={document.parentDocumentId}
+      parentDocumentName={document.parent?.name ?? null}
+      parentCandidates={parentCandidates}
     />
   );
 }
