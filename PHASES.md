@@ -174,7 +174,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 8: Split-View Layout ☐
+## Phase 8: Split-View Layout ✅
 
 **Goal:** The workspace uses a two-panel split-view with a draggable divider and responsive stacking.
 

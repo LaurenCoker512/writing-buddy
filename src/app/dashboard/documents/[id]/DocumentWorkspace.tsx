@@ -4,6 +4,7 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 import { DOCUMENT_TYPE_LABELS } from "@/lib/documents";
 import type { DocumentTypeValue } from "@/lib/documents";
+import SplitView from "@/components/SplitView";
 
 const TipTapEditor = dynamic(() => import("@/components/TipTapEditor"), {
   ssr: false,
@@ -23,6 +24,18 @@ interface DocumentWorkspaceProps {
   initialJson: object;
 }
 
+function AiChatPlaceholder() {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+      <div className="text-4xl text-accent-ai" aria-hidden="true">✦</div>
+      <p className="font-heading text-lg text-text-primary">AI Chat</p>
+      <p className="text-sm text-text-muted">
+        Your writing assistant will live here.
+      </p>
+    </div>
+  );
+}
+
 export default function DocumentWorkspace({
   documentId,
   documentName,
@@ -32,7 +45,7 @@ export default function DocumentWorkspace({
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const typeLabel = DOCUMENT_TYPE_LABELS[documentType as DocumentTypeValue] ?? documentType;
 
-  return (
+  const editorPanel = (
     <div className="flex h-full flex-col">
       <div className="flex shrink-0 items-baseline gap-3 border-b border-border bg-surface px-6 py-4">
         <h1 className="font-heading text-xl font-semibold text-text-primary">
@@ -40,7 +53,6 @@ export default function DocumentWorkspace({
         </h1>
         <span className="text-xs text-text-muted">{typeLabel}</span>
       </div>
-
       <div className="flex-1 overflow-auto">
         <TipTapEditor
           documentId={documentId}
@@ -52,4 +64,6 @@ export default function DocumentWorkspace({
       </div>
     </div>
   );
+
+  return <SplitView left={editorPanel} right={<AiChatPlaceholder />} />;
 }
