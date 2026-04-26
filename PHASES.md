@@ -217,7 +217,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 10: AI Chat — Core ☐
+## Phase 10: AI Chat — Core ✅
 
 **Goal:** A working AI chat panel with streaming responses backed by OpenRouter.
 

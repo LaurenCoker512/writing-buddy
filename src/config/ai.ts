@@ -50,6 +50,13 @@ export const AI_CONFIG = {
    */
   CONTRADICTION_WARN_THRESHOLD_TOKENS: 0,
 
+  // ---------------------------------------------------------------------------
+  // OpenRouter
+  // ---------------------------------------------------------------------------
+
+  /** Default model used for all AI chat and summarisation calls. */
+  OPENROUTER_DEFAULT_MODEL: "openai/gpt-4o-mini",
+
 } as const;
 
 // Fanfic mode (v1): no cache constants needed.

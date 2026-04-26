@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { DOCUMENT_TYPE_LABELS } from "@/lib/documents";
 import type { DocumentTypeValue } from "@/lib/documents";
 import SplitView from "@/components/SplitView";
+import ChatPanel from "@/components/ChatPanel";
 
 const TipTapEditor = dynamic(() => import("@/components/TipTapEditor"), {
   ssr: false,
@@ -22,18 +23,6 @@ interface DocumentWorkspaceProps {
   documentName: string;
   documentType: string;
   initialJson: object;
-}
-
-function AiChatPlaceholder() {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-      <div className="text-4xl text-accent-ai" aria-hidden="true">✦</div>
-      <p className="font-heading text-lg text-text-primary">AI Chat</p>
-      <p className="text-sm text-text-muted">
-        Your writing assistant will live here.
-      </p>
-    </div>
-  );
 }
 
 export default function DocumentWorkspace({
@@ -65,5 +54,5 @@ export default function DocumentWorkspace({
     </div>
   );
 
-  return <SplitView left={editorPanel} right={<AiChatPlaceholder />} />;
+  return <SplitView left={editorPanel} right={<ChatPanel documentId={documentId} />} />;
 }
