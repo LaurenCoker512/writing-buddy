@@ -405,7 +405,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 17: Relationship Map ☐
+## Phase 17: Relationship Map ✅
 
 **Goal:** An interactive graph of characters and relationships, navigable and scoped per story or universe.
 

@@ -207,6 +207,24 @@ function GripIcon({ className }: { className?: string }) {
   );
 }
 
+function GraphIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      className={className}
+      aria-hidden="true"
+    >
+      <circle cx="3" cy="8" r="2" />
+      <circle cx="13" cy="3.5" r="2" />
+      <circle cx="13" cy="12.5" r="2" />
+      <path d="M5 8h3.5M11 4.5l-2.5 3M11 11.5l-2.5-3" />
+    </svg>
+  );
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface ContextMenuState {
@@ -1100,17 +1118,13 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           }`}
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
         >
-          {hasDocuments ? (
-            <button
-              onClick={() => toggleExpanded(story.id)}
-              className="shrink-0 text-text-muted"
-              aria-label={isExpanded ? "Collapse" : "Expand"}
-            >
-              <ChevronIcon expanded={isExpanded} className="h-3 w-3" />
-            </button>
-          ) : (
-            <span className="h-3 w-3 shrink-0" />
-          )}
+          <button
+            onClick={() => toggleExpanded(story.id)}
+            className="shrink-0 text-text-muted"
+            aria-label={isExpanded ? "Collapse" : "Expand"}
+          >
+            <ChevronIcon expanded={isExpanded} className="h-3 w-3" />
+          </button>
           <button
             onClick={() => setActiveId(story.id)}
             className="flex flex-1 items-center gap-1.5 truncate"
@@ -1144,8 +1158,27 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             </>
           )}
         </div>
-        {isExpanded && hasDocuments && (
-          <ul>{renderDocumentSections(story.documents, depth + 1)}</ul>
+        {isExpanded && (
+          <ul>
+            {hasDocuments && renderDocumentSections(story.documents, depth + 1)}
+            <li key={`map-${story.id}`}>
+              <div style={{ paddingLeft: `${(depth + 1) * 12 + 8}px` }}>
+                <Link
+                  href={`/dashboard/stories/${story.id}/map`}
+                  className={`flex items-center gap-1.5 rounded px-2 py-1.5 text-sm transition-colors ${
+                    pathname === `/dashboard/stories/${story.id}/map`
+                      ? "bg-accent/10 text-accent"
+                      : "text-text-muted hover:bg-background hover:text-text-primary"
+                  }`}
+                  data-testid={`story-map-${story.id}`}
+                  aria-label={`Relationship Map for ${story.name}`}
+                >
+                  <GraphIcon className="h-3.5 w-3.5 shrink-0" />
+                  {!collapsed && <span className="truncate">Relationship Map</span>}
+                </Link>
+              </div>
+            </li>
+          </ul>
         )}
       </li>
     );
@@ -1214,7 +1247,6 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
   const renderUniverseNode = (universe: UniverseItem) => {
     const isExpanded = expanded.has(universe.id);
-    const hasChildren = universe.series.length > 0 || universe.stories.length > 0;
 
     return (
       <li key={universe.id}>
@@ -1225,21 +1257,17 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               : "text-text-primary hover:bg-background"
           }`}
         >
-          {hasChildren ? (
-            <button
-              onClick={() => toggleExpanded(universe.id)}
-              className="shrink-0 text-text-muted"
-              aria-label={isExpanded ? "Collapse" : "Expand"}
-            >
-              <ChevronIcon expanded={isExpanded} className="h-3 w-3" />
-            </button>
-          ) : (
-            <span className="h-3 w-3 shrink-0" />
-          )}
+          <button
+            onClick={() => toggleExpanded(universe.id)}
+            className="shrink-0 text-text-muted"
+            aria-label={isExpanded ? "Collapse" : "Expand"}
+          >
+            <ChevronIcon expanded={isExpanded} className="h-3 w-3" />
+          </button>
           <button
             onClick={() => {
               setActiveId(universe.id);
-              if (hasChildren) toggleExpanded(universe.id);
+              toggleExpanded(universe.id);
             }}
             className="flex flex-1 items-center gap-1.5 truncate"
             data-testid={`universe-node-${universe.id}`}
@@ -1263,10 +1291,27 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             </button>
           )}
         </div>
-        {isExpanded && hasChildren && (
+        {isExpanded && (
           <ul>
             {universe.series.map((s) => renderSeriesNode(s, 1))}
             {universe.stories.map((s) => renderStoryNode(s, 1))}
+            <li key={`map-${universe.id}`}>
+              <div style={{ paddingLeft: "20px" }}>
+                <Link
+                  href={`/dashboard/universes/${universe.id}/map`}
+                  className={`flex items-center gap-1.5 rounded px-2 py-1.5 text-sm transition-colors ${
+                    pathname === `/dashboard/universes/${universe.id}/map`
+                      ? "bg-accent/10 text-accent"
+                      : "text-text-muted hover:bg-background hover:text-text-primary"
+                  }`}
+                  data-testid={`universe-map-${universe.id}`}
+                  aria-label={`Relationship Map for ${universe.name}`}
+                >
+                  <GraphIcon className="h-3.5 w-3.5 shrink-0" />
+                  {!collapsed && <span className="truncate">Relationship Map</span>}
+                </Link>
+              </div>
+            </li>
           </ul>
         )}
       </li>

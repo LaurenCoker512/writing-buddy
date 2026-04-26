@@ -6,6 +6,7 @@ jest.mock("@/lib/prisma", () => ({
   prisma: {
     document: {
       findFirst: jest.fn(),
+      findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
@@ -17,7 +18,7 @@ jest.mock("@/lib/prisma", () => ({
 }));
 
 import { NextRequest } from "next/server";
-import { POST } from "@/app/api/documents/route";
+import { GET, POST } from "@/app/api/documents/route";
 import {
   GET as GET_ONE,
   PATCH,
@@ -28,6 +29,7 @@ import { prisma } from "@/lib/prisma";
 
 const mockAuth = auth as jest.Mock;
 const mockDocFindFirst = prisma.document.findFirst as jest.Mock;
+const mockDocFindMany = prisma.document.findMany as jest.Mock;
 const mockDocCreate = prisma.document.create as jest.Mock;
 const mockDocUpdate = prisma.document.update as jest.Mock;
 const mockDocDelete = prisma.document.delete as jest.Mock;
@@ -65,6 +67,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockAuth.mockResolvedValue(authed);
   mockDocFindFirst.mockResolvedValue(existingDocument);
+  mockDocFindMany.mockResolvedValue([existingDocument]);
   mockDocCreate.mockResolvedValue(existingDocument);
   mockDocUpdate.mockResolvedValue(existingDocument);
   mockDocDelete.mockResolvedValue(existingDocument);
@@ -336,6 +339,59 @@ describe("PATCH /api/documents/[id]", () => {
 
     const body = (await res.json()) as { tiptapJson: unknown };
     expect(body.tiptapJson).toEqual(newJson);
+  });
+});
+
+describe("GET /api/documents?storyId=[id]&types=CHARACTER,RELATIONSHIP", () => {
+  function makeGetRequest(url: string): NextRequest {
+    return new NextRequest(url, { method: "GET" });
+  }
+
+  test("returns documents for authenticated owner with story scope", async () => {
+    const docs = [
+      { ...existingDocument, type: "CHARACTER" },
+      { ...existingDocument, id: "doc-2", type: "RELATIONSHIP" },
+    ];
+    mockDocFindMany.mockResolvedValue(docs);
+
+    const res = await GET(
+      makeGetRequest("http://localhost/api/documents?storyId=story-1&types=CHARACTER,RELATIONSHIP"),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as unknown[];
+    expect(body).toHaveLength(2);
+  });
+
+  test("filters by types when provided", async () => {
+    await GET(
+      makeGetRequest("http://localhost/api/documents?storyId=story-1&types=CHARACTER,RELATIONSHIP"),
+    );
+
+    const findManyCall = mockDocFindMany.mock.calls[0][0] as {
+      where: { type?: { in: string[] } };
+    };
+    expect(findManyCall.where.type).toEqual({ in: ["CHARACTER", "RELATIONSHIP"] });
+  });
+
+  test("returns 400 when no scope param provided", async () => {
+    const res = await GET(makeGetRequest("http://localhost/api/documents"));
+    expect(res.status).toBe(400);
+  });
+
+  test("returns 401 when unauthenticated", async () => {
+    mockAuth.mockResolvedValue(null);
+    const res = await GET(
+      makeGetRequest("http://localhost/api/documents?storyId=story-1"),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  test("returns 404 when story not found", async () => {
+    mockStoryFindFirst.mockResolvedValue(null);
+    const res = await GET(
+      makeGetRequest("http://localhost/api/documents?storyId=story-1"),
+    );
+    expect(res.status).toBe(404);
   });
 });
 
