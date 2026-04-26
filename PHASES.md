@@ -499,7 +499,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 20: Fanfic Mode — Core ☐
+## Phase 20: Fanfic Mode — Core ✅
 
 **Goal:** Projects can be created in Fanfic mode with canon text ingested and tagged.
 

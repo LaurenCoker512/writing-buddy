@@ -10,20 +10,21 @@ export async function GET() {
 
   const userId = session.user.id;
 
-  const storyDocumentInclude = {
-    documents: {
-      select: { id: true, name: true, type: true, order: true, parentDocumentId: true },
-      orderBy: [
-        { order: "asc" as const },
-        { createdAt: "asc" as const },
-      ],
-    },
+  const documentSelect = {
+    select: { id: true, name: true, type: true, order: true, parentDocumentId: true, meta: true },
+    orderBy: [
+      { order: "asc" as const },
+      { createdAt: "asc" as const },
+    ],
   };
+
+  const storyDocumentInclude = { documents: documentSelect };
 
   const [universes, standaloneSeries, standaloneStories] = await Promise.all([
     prisma.universe.findMany({
       where: { userId },
       include: {
+        documents: documentSelect,
         series: {
           include: {
             stories: {

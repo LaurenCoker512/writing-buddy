@@ -33,6 +33,7 @@ import {
   type DocumentTypeValue,
 } from "@/lib/documents";
 import { calculateInsertOrder } from "@/lib/scene-order";
+import CanonIngestionModal from "@/components/CanonIngestionModal";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -278,8 +279,14 @@ interface CreateData {
   name: string;
   mode: string;
   rating: string;
+  sourceTitle?: string;
   universeId?: string;
   seriesId?: string;
+}
+
+interface CanonIngestionState {
+  universeId: string;
+  universeName: string;
 }
 
 interface NewDocumentState {
@@ -294,11 +301,13 @@ function ContextMenuDropdown({
   onRename,
   onDelete,
   onClose,
+  onImportCanon,
 }: {
   menu: ContextMenuState;
   onRename: () => void;
   onDelete: () => void;
   onClose: () => void;
+  onImportCanon?: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -326,6 +335,11 @@ function ContextMenuDropdown({
       <button role="menuitem" className={menuItemClass} onClick={onRename}>
         Rename
       </button>
+      {menu.type === "universe" && onImportCanon !== undefined && (
+        <button role="menuitem" className={menuItemClass} onClick={onImportCanon}>
+          Import Canon Text
+        </button>
+      )}
       {menu.type === "document" && (
         <>
           <a
@@ -503,6 +517,7 @@ function NewProjectModal({
   const [name, setName] = useState("");
   const [mode, setMode] = useState("ORIGINAL");
   const [rating, setRating] = useState("G");
+  const [sourceTitle, setSourceTitle] = useState("");
   const [universeId, setUniverseId] = useState("");
   const [seriesId, setSeriesId] = useState("");
   const [saving, setSaving] = useState(false);
@@ -516,6 +531,7 @@ function NewProjectModal({
       name: trimmed,
       mode,
       rating,
+      sourceTitle: mode === "FANFIC" && sourceTitle.trim() ? sourceTitle.trim() : undefined,
       universeId: universeId || undefined,
       seriesId: seriesId || undefined,
     });
@@ -648,6 +664,23 @@ function NewProjectModal({
             ))}
           </div>
         </div>
+
+        {/* Source Title (Fanfic only) */}
+        {mode === "FANFIC" && (
+          <div className="mb-4">
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-text-muted">
+              Source Title (optional)
+            </label>
+            <input
+              type="text"
+              value={sourceTitle}
+              onChange={(e) => setSourceTitle(e.target.value)}
+              placeholder="e.g. Harry Potter, Star Wars…"
+              className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-accent"
+              aria-label="Source title"
+            />
+          </div>
+        )}
 
         {/* Rating */}
         <div className="mb-6">
@@ -940,6 +973,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const [deleteModal, setDeleteModal] = useState<ModalState | null>(null);
   const [newProjectModal, setNewProjectModal] = useState(false);
   const [newDocumentModal, setNewDocumentModal] = useState<NewDocumentState | null>(null);
+  const [canonIngestionModal, setCanonIngestionModal] = useState<CanonIngestionState | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem("sidebar-collapsed");
@@ -1036,6 +1070,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       mode: data.mode,
       rating: data.rating,
     };
+    if (data.sourceTitle) body.sourceTitle = data.sourceTitle;
     if (data.itemType === "series" && data.universeId) {
       body.universeId = data.universeId;
     }
@@ -1043,13 +1078,17 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       if (data.universeId) body.universeId = data.universeId;
       if (data.seriesId) body.seriesId = data.seriesId;
     }
-    await fetch(endpoint, {
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     setNewProjectModal(false);
     fetchTree();
+    if (data.itemType === "universe" && data.mode === "FANFIC" && res.ok) {
+      const created = (await res.json()) as { id: string };
+      setCanonIngestionModal({ universeId: created.id, universeName: data.name });
+    }
   };
 
   // ── Tree node renderers ────────────────────────────────────────────────────
@@ -1068,13 +1107,21 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       >
         <Link
           href={`/dashboard/documents/${doc.id}`}
-          className="flex flex-1 items-center gap-1.5 truncate"
+          className="flex min-w-0 flex-1 items-center gap-1.5"
           data-testid={`document-node-${doc.id}`}
           aria-label={doc.name}
           aria-current={isActive ? "page" : undefined}
         >
           <FileIcon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
           {!collapsed && <span className="truncate">{doc.name}</span>}
+          {!collapsed && doc.meta?.isCanon === true && (
+            <span
+              className="shrink-0 rounded border border-amber-200 bg-amber-50 px-1 py-0.5 text-[10px] font-semibold leading-none text-amber-700"
+              aria-label="Canon"
+            >
+              C
+            </span>
+          )}
         </Link>
         {!collapsed && (
           <button
@@ -1325,6 +1372,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         </div>
         {isExpanded && (
           <ul>
+            {universe.documents.length > 0 && renderDocumentSections(universe.documents, 1)}
             {universe.series.map((s) => renderSeriesNode(s, 1))}
             {universe.stories.map((s) => renderStoryNode(s, 1))}
             <li key={`map-${universe.id}`}>
@@ -1499,6 +1547,17 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             });
             setContextMenu(null);
           }}
+          onImportCanon={
+            contextMenu.type === "universe"
+              ? () => {
+                  setCanonIngestionModal({
+                    universeId: contextMenu.id,
+                    universeName: contextMenu.name,
+                  });
+                  setContextMenu(null);
+                }
+              : undefined
+          }
         />
       )}
 
@@ -1538,6 +1597,16 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             handleDocumentCreate(newDocumentModal.storyId, type, name)
           }
           onClose={() => setNewDocumentModal(null)}
+        />
+      )}
+
+      {/* Canon ingestion modal */}
+      {canonIngestionModal !== null && (
+        <CanonIngestionModal
+          universeId={canonIngestionModal.universeId}
+          universeName={canonIngestionModal.universeName}
+          onClose={() => setCanonIngestionModal(null)}
+          onDocumentsCreated={fetchTree}
         />
       )}
     </>

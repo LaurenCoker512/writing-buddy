@@ -6,3 +6,10 @@ export interface DiffProposal {
   newMarkdown: string;
   isNew: boolean;
 }
+
+export interface CanonProposal {
+  id: string;
+  documentName: string;
+  documentType: "CHARACTER" | "WORLDBUILDING";
+  markdown: string;
+}

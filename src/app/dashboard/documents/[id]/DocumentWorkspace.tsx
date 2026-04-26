@@ -119,6 +119,14 @@ export default function DocumentWorkspace({
             {documentName}
           </h1>
           <span className="text-xs text-text-muted">{typeLabel}</span>
+          {initialMeta?.isCanon === true && (
+            <span
+              className="rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-700"
+              aria-label="Canon document"
+            >
+              [C]
+            </span>
+          )}
           <div className="ml-auto">
             <button
               type="button"

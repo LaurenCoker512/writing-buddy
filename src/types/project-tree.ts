@@ -4,6 +4,7 @@ export interface DocumentItem {
   type: string;
   order: number | null;
   parentDocumentId: string | null;
+  meta: Record<string, unknown> | null;
 }
 
 export interface StoryItem {
@@ -29,6 +30,7 @@ export interface UniverseItem {
   rating: string;
   series: SeriesItem[];
   stories: StoryItem[];
+  documents: DocumentItem[];
 }
 
 export interface ProjectTree {
