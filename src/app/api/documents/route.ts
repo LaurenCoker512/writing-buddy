@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isDocumentType, isValidDocumentScope } from "@/lib/documents";
+import { buildTemplate } from "@/lib/document-templates";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
     data: {
       type: body.type,
       name: body.name.trim(),
-      tiptapJson: { type: "doc", content: [] },
+      tiptapJson: buildTemplate(body.type),
       storyId,
       seriesId,
       universeId,

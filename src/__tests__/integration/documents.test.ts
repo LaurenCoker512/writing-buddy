@@ -93,12 +93,25 @@ describe("POST /api/documents", () => {
     expect(createCall.data.universeId).toBeNull();
   });
 
-  test("creates document with tiptapJson default", async () => {
+  test("POST with type CHARACTER returns document with starter headings in tiptapJson", async () => {
     const body = { name: "Aragorn", type: "CHARACTER", storyId: "story-1" };
     await POST(makeRequest(body));
 
     const createCall = mockDocCreate.mock.calls[0][0] as {
-      data: { tiptapJson: unknown };
+      data: { tiptapJson: { type: string; content: Array<{ type: string }> } };
+    };
+    expect(createCall.data.tiptapJson.type).toBe("doc");
+    expect(createCall.data.tiptapJson.content.length).toBeGreaterThan(0);
+    expect(createCall.data.tiptapJson.content[0].type).toBe("heading");
+  });
+
+  test("POST with type OTHER returns empty tiptapJson", async () => {
+    const body = { name: "Notes", type: "OTHER", storyId: "story-1" };
+    mockDocCreate.mockResolvedValue({ ...existingDocument, type: "OTHER" });
+    await POST(makeRequest(body));
+
+    const createCall = mockDocCreate.mock.calls[0][0] as {
+      data: { tiptapJson: { type: string; content: unknown[] } };
     };
     expect(createCall.data.tiptapJson).toEqual({ type: "doc", content: [] });
   });
@@ -217,6 +230,28 @@ describe("PATCH /api/documents/[id]", () => {
     });
     const res = await PATCH(req, PARAMS);
     expect(res.status).toBe(404);
+  });
+
+  test("updates meta and returns 200 with stored meta", async () => {
+    const metaPayload = { role: "Protagonist" };
+    const updatedDocument = { ...existingDocument, meta: metaPayload };
+    mockDocUpdate.mockResolvedValue(updatedDocument);
+
+    const req = new NextRequest("http://localhost/api/documents/doc-1", {
+      method: "PATCH",
+      body: JSON.stringify({ meta: metaPayload }),
+      headers: { "Content-Type": "application/json" },
+    });
+    const res = await PATCH(req, PARAMS);
+    expect(res.status).toBe(200);
+
+    const updateCall = mockDocUpdate.mock.calls[0][0] as {
+      data: { meta: unknown };
+    };
+    expect(updateCall.data.meta).toEqual({ role: "Protagonist" });
+
+    const body = (await res.json()) as { meta: unknown };
+    expect(body.meta).toEqual({ role: "Protagonist" });
   });
 
   test("updates tiptapJson and returns 200", async () => {

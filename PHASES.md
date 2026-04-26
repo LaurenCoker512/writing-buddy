@@ -354,7 +354,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 15: Document Type Templates ☐
+## Phase 15: Document Type Templates ✅
 
 **Goal:** New documents open with type-specific starter headings and structured metadata fields.
 

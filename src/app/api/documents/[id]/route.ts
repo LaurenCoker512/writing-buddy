@@ -45,7 +45,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = (await req.json()) as Record<string, unknown>;
-  const data: { name?: string; order?: number | null; tiptapJson?: Prisma.InputJsonValue } = {};
+  const data: {
+    name?: string;
+    order?: number | null;
+    tiptapJson?: Prisma.InputJsonValue;
+    meta?: Prisma.InputJsonValue;
+  } = {};
 
   if (typeof body.name === "string" && body.name.trim() !== "") {
     data.name = body.name.trim();
@@ -55,6 +60,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
   if (body.tiptapJson !== undefined && typeof body.tiptapJson === "object" && body.tiptapJson !== null) {
     data.tiptapJson = body.tiptapJson as Prisma.InputJsonValue;
+  }
+  if (body.meta !== undefined && typeof body.meta === "object" && body.meta !== null && !Array.isArray(body.meta)) {
+    data.meta = body.meta as Prisma.InputJsonValue;
   }
 
   if (Object.keys(data).length === 0) {

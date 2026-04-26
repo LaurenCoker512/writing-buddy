@@ -7,6 +7,7 @@ import type { DocumentTypeValue } from "@/lib/documents";
 import SplitView from "@/components/SplitView";
 import ChatPanel from "@/components/ChatPanel";
 import VersionHistoryPanel from "@/components/VersionHistoryPanel";
+import DocumentMetaBar from "@/components/DocumentMetaBar";
 import { replaceSectionInTipTap, appendSectionToTipTap } from "@/lib/section-utils";
 import type { TipTapDoc } from "@/lib/section-utils";
 import { markdownToTipTapNodes } from "@/lib/markdown-to-tiptap";
@@ -28,6 +29,7 @@ interface DocumentWorkspaceProps {
   documentName: string;
   documentType: string;
   initialJson: object;
+  initialMeta: Record<string, unknown> | null;
 }
 
 export default function DocumentWorkspace({
@@ -35,6 +37,7 @@ export default function DocumentWorkspace({
   documentName,
   documentType,
   initialJson,
+  initialMeta,
 }: DocumentWorkspaceProps) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [externalContent, setExternalContent] = useState<
@@ -102,6 +105,11 @@ export default function DocumentWorkspace({
           </button>
         </div>
       </div>
+      <DocumentMetaBar
+        documentId={documentId}
+        documentType={documentType as DocumentTypeValue}
+        initialMeta={initialMeta}
+      />
       <div className="flex-1 overflow-auto">
         <TipTapEditor
           documentId={documentId}

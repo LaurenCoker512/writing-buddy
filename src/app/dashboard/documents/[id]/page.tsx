@@ -29,12 +29,20 @@ export default async function DocumentPage({ params }: Props) {
       ? (document.tiptapJson as object)
       : { type: "doc", content: [] };
 
+  const initialMeta =
+    document.meta !== null &&
+    typeof document.meta === "object" &&
+    !Array.isArray(document.meta)
+      ? (document.meta as Record<string, unknown>)
+      : null;
+
   return (
     <DocumentWorkspace
       documentId={document.id}
       documentName={document.name}
       documentType={document.type}
       initialJson={tiptapJson}
+      initialMeta={initialMeta}
     />
   );
 }
