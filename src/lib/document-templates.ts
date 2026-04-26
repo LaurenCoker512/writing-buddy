@@ -69,3 +69,23 @@ export function buildTemplate(type: DocumentTypeValue): TipTapTemplateDoc {
   }
   return { type: "doc", content: headings.map(heading) };
 }
+
+interface TipTapParagraphNode {
+  type: "paragraph";
+  content: [TipTapTextNode];
+}
+
+export function buildPlotTemplateWithPremise(logline: string): {
+  type: "doc";
+  content: (TipTapHeadingNode | TipTapParagraphNode)[];
+} {
+  const headings = TEMPLATE_HEADINGS["PLOT"] ?? [];
+  const content: (TipTapHeadingNode | TipTapParagraphNode)[] = [];
+  for (const text of headings) {
+    content.push(heading(text));
+    if (text === "Premise") {
+      content.push({ type: "paragraph", content: [{ type: "text", text: logline }] });
+    }
+  }
+  return { type: "doc", content };
+}

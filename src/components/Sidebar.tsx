@@ -161,6 +161,22 @@ function CollapseIcon({
   );
 }
 
+function PromptsIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M3 2h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" />
+      <path d="M5 6h6M5 9h4" />
+    </svg>
+  );
+}
+
 function BrainstormIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -1415,6 +1431,15 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         >
           <BrainstormIcon className="h-4 w-4 shrink-0" />
           {!collapsed && <span>Brainstorm</span>}
+        </Link>
+        <Link
+          href={{ pathname: "/dashboard/prompts" }}
+          className={`flex items-center gap-2 rounded px-2 py-2 text-sm text-text-muted transition-colors hover:bg-background hover:text-text-primary ${collapsed ? "justify-center" : ""}`}
+          aria-label="Saved Prompts"
+          data-testid="prompts-link"
+        >
+          <PromptsIcon className="h-4 w-4 shrink-0" />
+          {!collapsed && <span>Saved Prompts</span>}
         </Link>
         <Link
           href="/settings"

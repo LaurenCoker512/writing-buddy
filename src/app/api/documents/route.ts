@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { isDocumentType, isValidDocumentScope } from "@/lib/documents";
 import { buildTemplate } from "@/lib/document-templates";
 
@@ -94,7 +95,7 @@ export async function POST(req: NextRequest) {
     data: {
       type: body.type,
       name: body.name.trim(),
-      tiptapJson: buildTemplate(body.type),
+      tiptapJson: buildTemplate(body.type) as unknown as Prisma.InputJsonValue,
       storyId,
       seriesId,
       universeId,
