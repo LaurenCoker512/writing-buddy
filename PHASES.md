@@ -151,7 +151,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 7: TipTap Editor & Autosave ☐
+## Phase 7: TipTap Editor & Autosave ✅
 
 **Goal:** A fully featured rich-text editor with silent autosave.
 

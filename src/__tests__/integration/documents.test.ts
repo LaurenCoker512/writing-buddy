@@ -218,6 +218,33 @@ describe("PATCH /api/documents/[id]", () => {
     const res = await PATCH(req, PARAMS);
     expect(res.status).toBe(404);
   });
+
+  test("updates tiptapJson and returns 200", async () => {
+    const newJson = {
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "Hello" }] }],
+    };
+    const updatedDocument = { ...existingDocument, tiptapJson: newJson };
+    mockDocUpdate.mockResolvedValue(updatedDocument);
+
+    const req = new NextRequest("http://localhost/api/documents/doc-1", {
+      method: "PATCH",
+      body: JSON.stringify({ tiptapJson: newJson }),
+      headers: { "Content-Type": "application/json" },
+    });
+    const res = await PATCH(req, PARAMS);
+    expect(res.status).toBe(200);
+
+    const updateCall = mockDocUpdate.mock.calls[0][0] as {
+      where: { id: string };
+      data: { tiptapJson: unknown };
+    };
+    expect(updateCall.where.id).toBe("doc-1");
+    expect(updateCall.data.tiptapJson).toEqual(newJson);
+
+    const body = (await res.json()) as { tiptapJson: unknown };
+    expect(body.tiptapJson).toEqual(newJson);
+  });
 });
 
 describe("DELETE /api/documents/[id]", () => {

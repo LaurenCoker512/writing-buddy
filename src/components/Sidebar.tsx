@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type {
   DocumentItem,
   NodeType,
@@ -695,6 +696,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
+  const pathname = usePathname();
   const [tree, setTree] = useState<ProjectTree | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -818,25 +820,28 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
   // ── Tree node renderers ────────────────────────────────────────────────────
 
-  const renderDocumentNode = (doc: DocumentItem, depth: number) => (
+  const renderDocumentNode = (doc: DocumentItem, depth: number) => {
+    const isActive = pathname === `/dashboard/documents/${doc.id}`;
+    return (
     <li key={doc.id}>
       <div
         className={`group flex items-center gap-1.5 rounded px-2 py-1.5 text-sm transition-colors ${
-          activeId === doc.id
+          isActive
             ? "bg-accent/10 text-accent"
             : "text-text-primary hover:bg-background"
         }`}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
       >
-        <button
-          onClick={() => setActiveId(doc.id)}
+        <Link
+          href={`/dashboard/documents/${doc.id}`}
           className="flex flex-1 items-center gap-1.5 truncate"
           data-testid={`document-node-${doc.id}`}
           aria-label={doc.name}
+          aria-current={isActive ? "page" : undefined}
         >
           <FileIcon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
           {!collapsed && <span className="truncate">{doc.name}</span>}
-        </button>
+        </Link>
         {!collapsed && (
           <button
             onClick={(e) => openContextMenu(e, doc.id, "document", doc.name)}
@@ -850,6 +855,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       </div>
     </li>
   );
+  };
 
   const renderDocumentSections = (documents: DocumentItem[], depth: number) =>
     DOCUMENT_TYPE_ORDER.flatMap((type) => {

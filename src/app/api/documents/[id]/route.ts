@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 
 type Params = { params: { id: string } };
 
@@ -44,13 +45,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = (await req.json()) as Record<string, unknown>;
-  const data: { name?: string; order?: number | null } = {};
+  const data: { name?: string; order?: number | null; tiptapJson?: Prisma.InputJsonValue } = {};
 
   if (typeof body.name === "string" && body.name.trim() !== "") {
     data.name = body.name.trim();
   }
   if (body.order !== undefined) {
     data.order = typeof body.order === "number" ? body.order : null;
+  }
+  if (body.tiptapJson !== undefined && typeof body.tiptapJson === "object" && body.tiptapJson !== null) {
+    data.tiptapJson = body.tiptapJson as Prisma.InputJsonValue;
   }
 
   if (Object.keys(data).length === 0) {
