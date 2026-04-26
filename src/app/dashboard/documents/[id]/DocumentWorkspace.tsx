@@ -6,6 +6,7 @@ import { DOCUMENT_TYPE_LABELS } from "@/lib/documents";
 import type { DocumentTypeValue } from "@/lib/documents";
 import SplitView from "@/components/SplitView";
 import ChatPanel from "@/components/ChatPanel";
+import VersionHistoryPanel from "@/components/VersionHistoryPanel";
 import { replaceSectionInTipTap, appendSectionToTipTap } from "@/lib/section-utils";
 import type { TipTapDoc } from "@/lib/section-utils";
 import { markdownToTipTapNodes } from "@/lib/markdown-to-tiptap";
@@ -39,6 +40,8 @@ export default function DocumentWorkspace({
   const [externalContent, setExternalContent] = useState<
     { json: object; nonce: number } | undefined
   >();
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [versionKey, setVersionKey] = useState(0);
 
   const typeLabel = DOCUMENT_TYPE_LABELS[documentType as DocumentTypeValue] ?? documentType;
 
@@ -71,7 +74,13 @@ export default function DocumentWorkspace({
 
     if (patchRes.ok) {
       setExternalContent({ json: newDoc, nonce: Date.now() });
+      setVersionKey((k) => k + 1);
     }
+  }
+
+  function handleRestore(tiptapJson: object) {
+    setExternalContent({ json: tiptapJson, nonce: Date.now() });
+    setVersionKey((k) => k + 1);
   }
 
   const editorPanel = (
@@ -81,6 +90,17 @@ export default function DocumentWorkspace({
           {documentName}
         </h1>
         <span className="text-xs text-text-muted">{typeLabel}</span>
+        <div className="ml-auto">
+          <button
+            type="button"
+            onClick={() => setHistoryOpen(true)}
+            aria-label="View version history"
+            data-testid="version-history-button"
+            className="rounded px-2 py-1 text-sm text-text-muted transition-colors hover:bg-background hover:text-text-primary"
+          >
+            History
+          </button>
+        </div>
       </div>
       <div className="flex-1 overflow-auto">
         <TipTapEditor
@@ -96,9 +116,19 @@ export default function DocumentWorkspace({
   );
 
   return (
-    <SplitView
-      left={editorPanel}
-      right={<ChatPanel documentId={documentId} onAcceptDiff={handleAcceptDiff} />}
-    />
+    <>
+      <SplitView
+        left={editorPanel}
+        right={<ChatPanel documentId={documentId} onAcceptDiff={handleAcceptDiff} />}
+      />
+      {historyOpen && (
+        <VersionHistoryPanel
+          documentId={documentId}
+          versionKey={versionKey}
+          onClose={() => setHistoryOpen(false)}
+          onRestore={handleRestore}
+        />
+      )}
+    </>
   );
 }

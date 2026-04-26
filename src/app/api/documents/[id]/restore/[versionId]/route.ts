@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { AI_CONFIG } from "@/config/ai";
@@ -18,55 +19,26 @@ async function findOwnedDoc(id: string, userId: string) {
   return doc;
 }
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { id } = await params;
-  const doc = await findOwnedDoc(id, session.user.id);
-  if (!doc) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  const versions = await prisma.documentVersion.findMany({
-    where: { documentId: id },
-    orderBy: { createdAt: "desc" },
-    select: { id: true, label: true, createdAt: true },
-  });
-
-  return NextResponse.json(versions);
-}
-
 export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string; versionId: string }> },
 ) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id } = await params;
-  const body = (await req.json()) as { tiptapJson?: unknown; label?: unknown };
-
-  if (
-    !body.tiptapJson ||
-    typeof body.tiptapJson !== "object" ||
-    Array.isArray(body.tiptapJson)
-  ) {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-  }
-
-  const label = typeof body.label === "string" ? body.label : undefined;
-
+  const { id, versionId } = await params;
   const doc = await findOwnedDoc(id, session.user.id);
   if (!doc) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const version = await prisma.documentVersion.findFirst({
+    where: { id: versionId, documentId: id },
+  });
+  if (!version) {
+    return NextResponse.json({ error: "Version not found" }, { status: 404 });
   }
 
   const count = await prisma.documentVersion.count({ where: { documentId: id } });
@@ -81,9 +53,20 @@ export async function POST(
     }
   }
 
-  const version = await prisma.documentVersion.create({
-    data: { documentId: id, tiptapJson: body.tiptapJson, label },
+  const restoredJson = version.tiptapJson as Prisma.InputJsonValue;
+
+  const newVersion = await prisma.documentVersion.create({
+    data: {
+      documentId: id,
+      tiptapJson: restoredJson,
+      label: "Restored",
+    },
   });
 
-  return NextResponse.json(version, { status: 201 });
+  await prisma.document.update({
+    where: { id },
+    data: { tiptapJson: restoredJson },
+  });
+
+  return NextResponse.json({ version: newVersion, tiptapJson: version.tiptapJson });
 }

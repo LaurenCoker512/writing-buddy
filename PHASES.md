@@ -326,7 +326,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 14: Version History ☐
+## Phase 14: Version History ✅
 
 **Goal:** A slide-over version history panel lets writers preview and restore prior document states.
 
