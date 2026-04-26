@@ -193,7 +193,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 9: Document Export ☐
+## Phase 9: Document Export ✅
 
 **Goal:** Individual documents and whole projects can be exported in multiple formats.
 

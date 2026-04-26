@@ -9,6 +9,8 @@ import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
 import { createAutosave, type PatchFn } from "@/lib/autosave";
+import { tiptapToMarkdown } from "@/lib/tiptap-to-markdown";
+import type { TipTapNode } from "@/lib/tiptap-to-markdown";
 
 // ── Toolbar ───────────────────────────────────────────────────────────────────
 
@@ -47,7 +49,36 @@ function Divider() {
   return <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />;
 }
 
-function Toolbar({ editor }: { editor: Editor }) {
+function downloadBlob(content: string, filename: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function Toolbar({
+  editor,
+  documentId,
+  documentName,
+}: {
+  editor: Editor;
+  documentId: string;
+  documentName: string;
+}) {
+  const getMarkdown = () => tiptapToMarkdown(editor.getJSON() as TipTapNode);
+
+  const handleDownloadMarkdown = () => {
+    const safeFilename = `${documentName.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-")}.md`;
+    downloadBlob(getMarkdown(), safeFilename, "text/markdown");
+  };
+
+  const handleCopyMarkdown = async () => {
+    await navigator.clipboard.writeText(getMarkdown());
+  };
+
   return (
     <div
       role="toolbar"
@@ -142,6 +173,24 @@ function Toolbar({ editor }: { editor: Editor }) {
       >
         ─
       </ToolbarButton>
+
+      <Divider />
+
+      <ToolbarButton onClick={handleDownloadMarkdown} label="Download as Markdown">
+        ↓ .md
+      </ToolbarButton>
+      <ToolbarButton onClick={handleCopyMarkdown} label="Copy as Markdown">
+        ⎘ md
+      </ToolbarButton>
+      <a
+        href={`/api/export/document/${documentId}/pdf`}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Export as PDF"
+        className="rounded px-2 py-1 text-sm font-medium text-text-muted transition-colors hover:bg-background hover:text-text-primary"
+      >
+        ↓ PDF
+      </a>
     </div>
   );
 }
@@ -241,7 +290,9 @@ export default function TipTapEditor({
 
   return (
     <div className="flex flex-col">
-      {editor && <Toolbar editor={editor} />}
+      {editor && (
+        <Toolbar editor={editor} documentId={documentId} documentName={documentName} />
+      )}
       <div className="flex items-center justify-end border-b border-border bg-surface px-4 py-1">
         <SaveIndicator status={saveStatus} />
       </div>

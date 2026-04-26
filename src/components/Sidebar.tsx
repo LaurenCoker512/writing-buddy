@@ -233,21 +233,43 @@ function ContextMenuDropdown({
     return () => document.removeEventListener("mousedown", handler);
   }, [onClose]);
 
+  const menuItemClass =
+    "block w-full px-4 py-2 text-left text-sm text-text-primary hover:bg-background";
+
   return (
     <div
       ref={ref}
       role="menu"
       data-testid="context-menu"
-      className="fixed z-50 min-w-[120px] rounded border border-border bg-surface py-1 shadow-lg"
+      className="fixed z-50 min-w-[140px] rounded border border-border bg-surface py-1 shadow-lg"
       style={{ top: menu.y, left: menu.x }}
     >
-      <button
-        role="menuitem"
-        className="block w-full px-4 py-2 text-left text-sm text-text-primary hover:bg-background"
-        onClick={onRename}
-      >
+      <button role="menuitem" className={menuItemClass} onClick={onRename}>
         Rename
       </button>
+      {menu.type === "document" && (
+        <>
+          <a
+            role="menuitem"
+            href={`/api/export/document/${menu.id}/markdown`}
+            download
+            className={menuItemClass}
+            onClick={onClose}
+          >
+            Export as Markdown
+          </a>
+          <a
+            role="menuitem"
+            href={`/api/export/document/${menu.id}/pdf`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={menuItemClass}
+            onClick={onClose}
+          >
+            Export as PDF
+          </a>
+        </>
+      )}
       <button
         role="menuitem"
         className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-background"
