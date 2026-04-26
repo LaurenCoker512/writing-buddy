@@ -161,6 +161,22 @@ function CollapseIcon({
   );
 }
 
+function BrainstormIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M8 1.5a5 5 0 0 1 3.5 8.5l-.5 1H5l-.5-1A5 5 0 0 1 8 1.5Z" />
+      <path d="M6 11v1.5a2 2 0 0 0 4 0V11" />
+    </svg>
+  );
+}
+
 function SettingsIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -1391,6 +1407,15 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
       {/* Footer */}
       <div className="border-t border-border p-2">
+        <Link
+          href={{ pathname: "/dashboard/brainstorm" }}
+          className={`flex items-center gap-2 rounded px-2 py-2 text-sm text-text-muted transition-colors hover:bg-background hover:text-text-primary ${collapsed ? "justify-center" : ""}`}
+          aria-label="Brainstorm"
+          data-testid="brainstorm-link"
+        >
+          <BrainstormIcon className="h-4 w-4 shrink-0" />
+          {!collapsed && <span>Brainstorm</span>}
+        </Link>
         <Link
           href="/settings"
           className={`flex items-center gap-2 rounded px-2 py-2 text-sm text-text-muted transition-colors hover:bg-background hover:text-text-primary ${collapsed ? "justify-center" : ""}`}

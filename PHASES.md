@@ -440,7 +440,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 18: Brainstorm — Logline Generation ☐
+## Phase 18: Brainstorm — Logline Generation ✅
 
 **Goal:** Writers can generate batches of story loglines from a free-text seed and mode selection.
 

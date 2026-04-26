@@ -57,6 +57,9 @@ export const AI_CONFIG = {
   /** Default model used for all AI chat and summarisation calls. */
   OPENROUTER_DEFAULT_MODEL: "openai/gpt-4o-mini",
 
+  /** Number of loglines generated per brainstorm batch. */
+  BRAINSTORM_LOGLINE_COUNT: 5,
+
 } as const;
 
 // Fanfic mode (v1): no cache constants needed.
