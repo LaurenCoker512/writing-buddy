@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { decryptApiKey } from "@/lib/encryption";
-import { buildTier1Context, buildSystemPrompt } from "@/lib/ai-context";
+import { buildTier1Context, buildSystemPrompt, buildTier2Context } from "@/lib/ai-context";
 import type { ChatMessage } from "@/lib/ai-context";
 import type { TipTapNode } from "@/lib/tiptap-to-markdown";
 import { AI_CONFIG } from "@/config/ai";
 import { shouldPruneChatMessages } from "@/lib/chat-pruning";
+import { ensureContentSummariesFresh } from "@/lib/content-summary";
 
 async function findOwnedDocument(id: string, userId: string) {
   const document = await prisma.document.findFirst({
@@ -135,6 +136,29 @@ export async function POST(req: NextRequest) {
     content: m.content,
   }));
 
+  const siblingWhere = document.storyId
+    ? { storyId: document.storyId }
+    : document.seriesId
+      ? { seriesId: document.seriesId }
+      : document.universeId
+        ? { universeId: document.universeId }
+        : null;
+
+  const freshSiblings =
+    siblingWhere !== null
+      ? await ensureContentSummariesFresh(
+          await prisma.document
+            .findMany({
+              where: { ...siblingWhere, id: { not: document.id } },
+              select: { id: true },
+            })
+            .then((docs) => docs.map((d) => d.id)),
+          apiKey,
+        )
+      : [];
+
+  const tier2Context = buildTier2Context(freshSiblings, document.type);
+
   const { documentMarkdown, recentMessages } = buildTier1Context(
     document.tiptapJson as TipTapNode,
     chatMessages,
@@ -145,6 +169,7 @@ export async function POST(req: NextRequest) {
     owner.mode,
     owner.rating,
     document.chatSummary,
+    tier2Context || null,
   );
 
   const openRouterResponse = await fetch(

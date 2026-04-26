@@ -2,7 +2,7 @@ jest.mock("@/auth", () => ({ auth: jest.fn() }));
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
-    document: { findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    document: { findFirst: jest.fn(), findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     user: { findUnique: jest.fn() },
     chatMessage: {
       findMany: jest.fn(),
@@ -88,6 +88,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockAuth.mockResolvedValue(authed);
   mockDocFindFirst.mockResolvedValue(existingDocument);
+  (prisma.document.findMany as jest.Mock).mockResolvedValue([]);
   mockUserFindUnique.mockResolvedValue({ openRouterKey: "encrypted-key" });
   mockChatFindMany.mockResolvedValue([]);
   mockChatCount.mockResolvedValue(2);
