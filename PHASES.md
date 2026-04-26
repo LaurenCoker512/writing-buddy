@@ -248,7 +248,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 11: Chat Persistence & Pruning ☐
+## Phase 11: Chat Persistence & Pruning ✅
 
 **Goal:** Chat history is persisted per document and automatically pruned with a rolling summary.
 

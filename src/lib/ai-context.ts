@@ -29,15 +29,22 @@ export function buildSystemPrompt(
   documentMarkdown: string,
   mode: string,
   rating: string,
+  chatSummary?: string | null,
 ): string {
   const modeLabel = mode === "FANFIC" ? "fanfiction" : "original fiction";
   const ratingDesc = RATING_DESCRIPTIONS[rating] ?? "general";
 
-  return [
+  const parts = [
     `You are a writing assistant helping with a ${modeLabel} story (rated ${rating} — ${ratingDesc}).`,
     "Your role is to help the writer develop characters, plot, worldbuilding, and prose. Be creative, collaborative, and responsive to the writer's vision.",
     "",
     "Current document:",
     documentMarkdown || "(empty document)",
-  ].join("\n");
+  ];
+
+  if (chatSummary) {
+    parts.push("", "Summary of earlier conversation:", chatSummary);
+  }
+
+  return parts.join("\n");
 }

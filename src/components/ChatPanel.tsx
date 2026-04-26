@@ -14,10 +14,34 @@ interface ChatPanelProps {
 
 export default function ChatPanel({ documentId }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [chatSummary, setChatSummary] = useState<string | null>(null);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [noApiKey, setNoApiKey] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    async function loadHistory() {
+      try {
+        const res = await fetch(`/api/documents/${documentId}/messages`);
+        if (res.ok) {
+          const data = (await res.json()) as {
+            messages: Array<{ role: string; content: string }>;
+            chatSummary: string | null;
+          };
+          const loaded = data.messages.filter(
+            (m): m is Message => m.role === "user" || m.role === "assistant",
+          );
+          setMessages(loaded);
+          setChatSummary(data.chatSummary);
+        }
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    }
+    void loadHistory();
+  }, [documentId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -27,7 +51,6 @@ export default function ChatPanel({ documentId }: ChatPanelProps) {
     const content = input.trim();
     if (!content || isStreaming) return;
 
-    const historySnapshot = messages;
     setMessages((prev) => [...prev, { role: "user", content }]);
     setInput("");
     setIsStreaming(true);
@@ -38,7 +61,7 @@ export default function ChatPanel({ documentId }: ChatPanelProps) {
       const response = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ documentId, content, messages: historySnapshot }),
+        body: JSON.stringify({ documentId, content }),
       });
 
       if (response.status === 402) {
@@ -106,7 +129,11 @@ export default function ChatPanel({ documentId }: ChatPanelProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
-        {messages.length === 0 && !noApiKey && (
+        {isLoadingHistory && (
+          <p className="py-8 text-center text-sm text-text-muted">Loading chat history…</p>
+        )}
+
+        {!isLoadingHistory && messages.length === 0 && !noApiKey && (
           <p className="py-8 text-center text-sm text-text-muted">
             Ask me anything about your document.
           </p>
@@ -125,31 +152,38 @@ export default function ChatPanel({ documentId }: ChatPanelProps) {
           </div>
         )}
 
-        <div className="flex flex-col gap-4">
-          {messages.map((message, index) => (
-            <div
-              key={index}
-              className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-            >
+        {!isLoadingHistory && (
+          <div className="flex flex-col gap-4">
+            {chatSummary !== null && (
+              <p className="text-center text-xs italic text-text-muted">
+                Earlier conversation has been summarized.
+              </p>
+            )}
+            {messages.map((message, index) => (
               <div
-                className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${
-                  message.role === "user"
-                    ? "bg-accent text-white"
-                    : "border border-border bg-surface text-text-primary"
-                }`}
+                key={index}
+                className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
               >
-                {isStreaming && index === messages.length - 1 && !message.content ? (
-                  <span
-                    className="inline-block h-4 w-2 animate-pulse bg-text-muted"
-                    aria-label="Loading response"
-                  />
-                ) : (
-                  <p className="whitespace-pre-wrap">{message.content}</p>
-                )}
+                <div
+                  className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${
+                    message.role === "user"
+                      ? "bg-accent text-white"
+                      : "border border-border bg-surface text-text-primary"
+                  }`}
+                >
+                  {isStreaming && index === messages.length - 1 && !message.content ? (
+                    <span
+                      className="inline-block h-4 w-2 animate-pulse bg-text-muted"
+                      aria-label="Loading response"
+                    />
+                  ) : (
+                    <p className="whitespace-pre-wrap">{message.content}</p>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
 

@@ -4,6 +4,12 @@ jest.mock("@/lib/prisma", () => ({
   prisma: {
     document: { findFirst: jest.fn() },
     user: { findUnique: jest.fn() },
+    chatMessage: {
+      findMany: jest.fn(),
+      count: jest.fn(),
+      createMany: jest.fn(),
+    },
+    $transaction: jest.fn(),
   },
 }));
 
@@ -22,6 +28,9 @@ import { prisma } from "@/lib/prisma";
 const mockAuth = auth as jest.Mock;
 const mockDocFindFirst = prisma.document.findFirst as jest.Mock;
 const mockUserFindUnique = prisma.user.findUnique as jest.Mock;
+const mockChatFindMany = prisma.chatMessage.findMany as jest.Mock;
+const mockChatCount = prisma.chatMessage.count as jest.Mock;
+const mockChatCreateMany = prisma.chatMessage.createMany as jest.Mock;
 
 const authed = { user: { id: "user-1" } };
 
@@ -30,6 +39,7 @@ const existingDocument = {
   type: "CHARACTER",
   name: "Aragorn",
   tiptapJson: { type: "doc", content: [] },
+  chatSummary: null,
   storyId: "story-1",
   seriesId: null,
   universeId: null,
@@ -68,20 +78,24 @@ beforeEach(() => {
   mockAuth.mockResolvedValue(authed);
   mockDocFindFirst.mockResolvedValue(existingDocument);
   mockUserFindUnique.mockResolvedValue({ openRouterKey: "encrypted-key" });
+  mockChatFindMany.mockResolvedValue([]);
+  mockChatCount.mockResolvedValue(2);
+  mockChatCreateMany.mockResolvedValue({ count: 2 });
+  (prisma.$transaction as jest.Mock).mockResolvedValue([]);
   mockFetch.mockResolvedValue(makeSseStream("Hello!"));
 });
 
 describe("POST /api/ai/chat", () => {
   test("returns streamed SSE with Content-Type text/event-stream", async () => {
     const res = await POST(
-      makeRequest({ documentId: "doc-1", content: "Tell me about this character", messages: [] }),
+      makeRequest({ documentId: "doc-1", content: "Tell me about this character" }),
     );
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toContain("text/event-stream");
   });
 
   test("calls OpenRouter with correct authorization header", async () => {
-    await POST(makeRequest({ documentId: "doc-1", content: "Hello", messages: [] }));
+    await POST(makeRequest({ documentId: "doc-1", content: "Hello" }));
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining("openrouter.ai"),
       expect.objectContaining({
@@ -92,7 +106,7 @@ describe("POST /api/ai/chat", () => {
   });
 
   test("includes system message and user message in OpenRouter request", async () => {
-    await POST(makeRequest({ documentId: "doc-1", content: "Hello", messages: [] }));
+    await POST(makeRequest({ documentId: "doc-1", content: "Hello" }));
 
     const fetchBody = JSON.parse(
       (mockFetch.mock.calls[0] as [string, { body: string }])[1].body,
@@ -102,12 +116,14 @@ describe("POST /api/ai/chat", () => {
     expect(fetchBody.messages.at(-1)?.content).toBe("Hello");
   });
 
-  test("includes recent history messages before the user message", async () => {
-    const history = [
-      { role: "user", content: "Earlier question" },
-      { role: "assistant", content: "Earlier answer" },
+  test("includes recent history messages from DB before the user message", async () => {
+    const dbHistory = [
+      { id: "m-1", role: "user", content: "Earlier question", createdAt: new Date() },
+      { id: "m-2", role: "assistant", content: "Earlier answer", createdAt: new Date() },
     ];
-    await POST(makeRequest({ documentId: "doc-1", content: "New question", messages: history }));
+    mockChatFindMany.mockResolvedValue(dbHistory);
+
+    await POST(makeRequest({ documentId: "doc-1", content: "New question" }));
 
     const fetchBody = JSON.parse(
       (mockFetch.mock.calls[0] as [string, { body: string }])[1].body,
@@ -120,7 +136,7 @@ describe("POST /api/ai/chat", () => {
 
   test("returns 402 with no_api_key error when key is absent", async () => {
     mockUserFindUnique.mockResolvedValue({ openRouterKey: null });
-    const res = await POST(makeRequest({ documentId: "doc-1", content: "Hello", messages: [] }));
+    const res = await POST(makeRequest({ documentId: "doc-1", content: "Hello" }));
     expect(res.status).toBe(402);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("no_api_key");
@@ -128,19 +144,19 @@ describe("POST /api/ai/chat", () => {
 
   test("does not call OpenRouter when API key is absent", async () => {
     mockUserFindUnique.mockResolvedValue({ openRouterKey: null });
-    await POST(makeRequest({ documentId: "doc-1", content: "Hello", messages: [] }));
+    await POST(makeRequest({ documentId: "doc-1", content: "Hello" }));
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
   test("returns 401 when unauthenticated", async () => {
     mockAuth.mockResolvedValue(null);
-    const res = await POST(makeRequest({ documentId: "doc-1", content: "Hello", messages: [] }));
+    const res = await POST(makeRequest({ documentId: "doc-1", content: "Hello" }));
     expect(res.status).toBe(401);
   });
 
   test("returns 404 when document is not found or not owned", async () => {
     mockDocFindFirst.mockResolvedValue(null);
-    const res = await POST(makeRequest({ documentId: "doc-1", content: "Hello", messages: [] }));
+    const res = await POST(makeRequest({ documentId: "doc-1", content: "Hello" }));
     expect(res.status).toBe(404);
   });
 
