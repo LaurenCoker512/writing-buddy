@@ -6,6 +6,10 @@ import { DOCUMENT_TYPE_LABELS } from "@/lib/documents";
 import type { DocumentTypeValue } from "@/lib/documents";
 import SplitView from "@/components/SplitView";
 import ChatPanel from "@/components/ChatPanel";
+import { replaceSectionInTipTap, appendSectionToTipTap } from "@/lib/section-utils";
+import type { TipTapDoc } from "@/lib/section-utils";
+import { markdownToTipTapNodes } from "@/lib/markdown-to-tiptap";
+import type { DiffProposal } from "@/types/diff";
 
 const TipTapEditor = dynamic(() => import("@/components/TipTapEditor"), {
   ssr: false,
@@ -32,7 +36,43 @@ export default function DocumentWorkspace({
   initialJson,
 }: DocumentWorkspaceProps) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [externalContent, setExternalContent] = useState<
+    { json: object; nonce: number } | undefined
+  >();
+
   const typeLabel = DOCUMENT_TYPE_LABELS[documentType as DocumentTypeValue] ?? documentType;
+
+  async function handleAcceptDiff(proposal: DiffProposal) {
+    const docRes = await fetch(`/api/documents/${documentId}`);
+    if (!docRes.ok) return;
+
+    const doc = (await docRes.json()) as { tiptapJson: object };
+    const currentDoc = doc.tiptapJson as TipTapDoc;
+
+    const newNodes = markdownToTipTapNodes(proposal.newMarkdown);
+    let newDoc: TipTapDoc;
+    if (proposal.isNew || proposal.heading === null) {
+      newDoc = appendSectionToTipTap(currentDoc, newNodes);
+    } else {
+      newDoc = replaceSectionInTipTap(currentDoc, proposal.heading, newNodes);
+    }
+
+    await fetch(`/api/documents/${documentId}/versions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tiptapJson: currentDoc }),
+    });
+
+    const patchRes = await fetch(`/api/documents/${documentId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tiptapJson: newDoc }),
+    });
+
+    if (patchRes.ok) {
+      setExternalContent({ json: newDoc, nonce: Date.now() });
+    }
+  }
 
   const editorPanel = (
     <div className="flex h-full flex-col">
@@ -49,10 +89,16 @@ export default function DocumentWorkspace({
           documentName={documentName}
           saveStatus={saveStatus}
           onSaveStatusChange={setSaveStatus}
+          externalContent={externalContent}
         />
       </div>
     </div>
   );
 
-  return <SplitView left={editorPanel} right={<ChatPanel documentId={documentId} />} />;
+  return (
+    <SplitView
+      left={editorPanel}
+      right={<ChatPanel documentId={documentId} onAcceptDiff={handleAcceptDiff} />}
+    />
+  );
 }

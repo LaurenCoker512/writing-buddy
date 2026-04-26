@@ -240,6 +240,7 @@ interface TipTapEditorProps {
   saveStatus: SaveStatus;
   onSaveStatusChange: (status: SaveStatus) => void;
   patchFn?: PatchFn;
+  externalContent?: { json: object; nonce: number };
 }
 
 export default function TipTapEditor({
@@ -249,6 +250,7 @@ export default function TipTapEditor({
   saveStatus,
   onSaveStatusChange,
   patchFn = defaultPatchFn,
+  externalContent,
 }: TipTapEditorProps) {
   const autosaveRef = useRef(
     createAutosave(documentId, AUTOSAVE_DELAY_MS, async (id, json) => {
@@ -263,6 +265,8 @@ export default function TipTapEditor({
     const autosave = autosaveRef.current;
     return () => autosave.cancel();
   }, []);
+
+  const appliedNonceRef = useRef(0);
 
   const editor = useEditor({
     extensions: [
@@ -287,6 +291,14 @@ export default function TipTapEditor({
       },
     },
   });
+
+  useEffect(() => {
+    if (!editor || !externalContent) return;
+    if (externalContent.nonce === appliedNonceRef.current) return;
+    appliedNonceRef.current = externalContent.nonce;
+    editor.commands.setContent(externalContent.json);
+    autosaveRef.current.trigger(externalContent.json);
+  }, [editor, externalContent]);
 
   return (
     <div className="flex flex-col">

@@ -275,7 +275,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 12: AI Diff Proposals ☐
+## Phase 12: AI Diff Proposals ✅
 
 **Goal:** The AI can propose section-level edits displayed as accept/reject diff cards.
 
