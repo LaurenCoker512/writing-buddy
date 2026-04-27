@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { decryptApiKey } from "@/lib/encryption";
-import { buildTier1Context, buildSystemPrompt, buildTier2Context } from "@/lib/ai-context";
+import { buildTier1Context, buildSystemPrompt, buildTier2Context, buildCanonContext } from "@/lib/ai-context";
 import type { ChatMessage } from "@/lib/ai-context";
 import type { TipTapNode } from "@/lib/tiptap-to-markdown";
 import { AI_CONFIG } from "@/config/ai";
@@ -159,6 +159,45 @@ export async function POST(req: NextRequest) {
 
   const tier2Context = buildTier2Context(freshSiblings, document.type);
 
+  // For FANFIC mode: build canon context from Universe-level isCanon documents
+  let canonContext: string | null = null;
+  if (owner.mode === "FANFIC") {
+    let universeId: string | null = document.universeId ?? null;
+    if (!universeId && document.storyId) {
+      const story = await prisma.story.findUnique({
+        where: { id: document.storyId },
+        select: { universeId: true },
+      });
+      universeId = story?.universeId ?? null;
+    }
+    if (!universeId && document.seriesId) {
+      const series = await prisma.series.findUnique({
+        where: { id: document.seriesId },
+        select: { universeId: true },
+      });
+      universeId = series?.universeId ?? null;
+    }
+
+    if (universeId) {
+      const universeDocs = await prisma.document.findMany({
+        where: { universeId },
+        select: { id: true, meta: true },
+      });
+      const canonDocIds = universeDocs
+        .filter((d) => {
+          if (typeof d.meta !== "object" || d.meta === null || Array.isArray(d.meta)) return false;
+          return (d.meta as Record<string, unknown>).isCanon === true;
+        })
+        .map((d) => d.id);
+
+      if (canonDocIds.length > 0) {
+        const freshCanonDocs = await ensureContentSummariesFresh(canonDocIds, apiKey);
+        const ctx = buildCanonContext(freshCanonDocs);
+        if (ctx) canonContext = ctx;
+      }
+    }
+  }
+
   const { documentMarkdown, recentMessages } = buildTier1Context(
     document.tiptapJson as TipTapNode,
     chatMessages,
@@ -170,6 +209,7 @@ export async function POST(req: NextRequest) {
     owner.rating,
     document.chatSummary,
     tier2Context || null,
+    canonContext,
   );
 
   const openRouterResponse = await fetch(

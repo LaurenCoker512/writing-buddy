@@ -3,6 +3,7 @@ import {
   buildSystemPrompt,
   sortSiblingDocuments,
   buildTier2Context,
+  buildCanonContext,
 } from "@/lib/ai-context";
 import type { ChatMessage, SiblingDocument } from "@/lib/ai-context";
 import { AI_CONFIG } from "@/config/ai";
@@ -98,6 +99,57 @@ describe("buildSystemPrompt", () => {
   test("omits tier2Context section when not provided", () => {
     const prompt = buildSystemPrompt("# Doc", "ORIGINAL", "G");
     expect(prompt).not.toContain("Related documents");
+  });
+
+  test("includes canon context section for FANFIC mode when canonContext provided", () => {
+    const canonCtx = "### Hermione (CHARACTER)\nA brilliant witch.";
+    const prompt = buildSystemPrompt("# Doc", "FANFIC", "T", null, null, canonCtx);
+    expect(prompt).toContain("Canon reference documents");
+    expect(prompt).toContain("Hermione");
+    expect(prompt).toContain("[Canon]");
+  });
+
+  test("omits canon section for ORIGINAL mode even when canonContext provided", () => {
+    const canonCtx = "### Hermione (CHARACTER)\nA brilliant witch.";
+    const prompt = buildSystemPrompt("# Doc", "ORIGINAL", "T", null, null, canonCtx);
+    expect(prompt).not.toContain("Canon reference documents");
+  });
+
+  test("omits canon section for FANFIC mode when canonContext is null", () => {
+    const prompt = buildSystemPrompt("# Doc", "FANFIC", "T", null, null, null);
+    expect(prompt).not.toContain("Canon reference documents");
+  });
+});
+
+describe("buildCanonContext", () => {
+  test("formats docs with summaries into canon context string", () => {
+    const docs: SiblingDocument[] = [
+      { id: "1", type: "CHARACTER", name: "Harry", contentSummary: "The boy who lived." },
+      { id: "2", type: "WORLDBUILDING", name: "Hogwarts", contentSummary: "A wizarding school." },
+    ];
+    const ctx = buildCanonContext(docs);
+    expect(ctx).toContain("### Harry (CHARACTER)");
+    expect(ctx).toContain("The boy who lived.");
+    expect(ctx).toContain("### Hogwarts (WORLDBUILDING)");
+  });
+
+  test("excludes documents with null or empty contentSummary", () => {
+    const docs: SiblingDocument[] = [
+      { id: "1", type: "CHARACTER", name: "Harry", contentSummary: "The boy who lived." },
+      { id: "2", type: "CHARACTER", name: "Voldemort", contentSummary: null },
+      { id: "3", type: "CHARACTER", name: "Neville", contentSummary: "   " },
+    ];
+    const ctx = buildCanonContext(docs);
+    expect(ctx).toContain("Harry");
+    expect(ctx).not.toContain("Voldemort");
+    expect(ctx).not.toContain("Neville");
+  });
+
+  test("returns empty string when no docs have summaries", () => {
+    const docs: SiblingDocument[] = [
+      { id: "1", type: "CHARACTER", name: "Ghost", contentSummary: null },
+    ];
+    expect(buildCanonContext(docs)).toBe("");
   });
 });
 

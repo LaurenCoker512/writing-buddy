@@ -526,7 +526,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 21: Fanfic Mode — AI Integration & AU Variants ☐
+## Phase 21: Fanfic Mode — AI Integration & AU Variants ✅
 
 **Goal:** The AI labels canon references inline and writers can create and distinguish AU variants.
 

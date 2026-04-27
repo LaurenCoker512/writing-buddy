@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import DiffCard from "@/components/DiffCard";
 import type { DiffProposal } from "@/types/diff";
+import { parseInlineBadges } from "@/lib/canon-badge";
 
 type ChatMessage = { kind: "message"; key: string; role: "user" | "assistant"; content: string };
 type DiffItem = { kind: "diff"; key: string; proposal: DiffProposal };
@@ -12,9 +13,41 @@ type ChatItem = ChatMessage | DiffItem;
 interface ChatPanelProps {
   documentId: string;
   onAcceptDiff: (proposal: DiffProposal) => Promise<void>;
+  initialDiffProposals?: DiffProposal[];
 }
 
-export default function ChatPanel({ documentId, onAcceptDiff }: ChatPanelProps) {
+function AssistantMessageContent({ content }: { content: string }) {
+  const segments = parseInlineBadges(content);
+  return (
+    <p className="whitespace-pre-wrap">
+      {segments.map((seg, index) => {
+        if (seg.type === "canon") {
+          return (
+            <span
+              key={index}
+              className="mx-0.5 inline-block rounded border border-amber-300 bg-amber-50 px-1 py-0.5 text-[10px] font-bold leading-none text-amber-700"
+            >
+              Canon
+            </span>
+          );
+        }
+        if (seg.type === "au") {
+          return (
+            <span
+              key={index}
+              className="mx-0.5 inline-block rounded border border-indigo-300 bg-indigo-50 px-1 py-0.5 text-[10px] font-bold leading-none text-indigo-700"
+            >
+              AU
+            </span>
+          );
+        }
+        return <span key={index}>{seg.content}</span>;
+      })}
+    </p>
+  );
+}
+
+export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposals }: ChatPanelProps) {
   const [items, setItems] = useState<ChatItem[]>([]);
   const [chatSummary, setChatSummary] = useState<string | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
@@ -44,7 +77,12 @@ export default function ChatPanel({ documentId, onAcceptDiff }: ChatPanelProps) 
               m.role === "user" || m.role === "assistant",
             )
             .map((m) => ({ kind: "message", key: nextKey(), role: m.role, content: m.content }));
-          setItems(loaded);
+          const pendingDiffs: ChatItem[] = (initialDiffProposals ?? []).map((proposal) => ({
+            kind: "diff",
+            key: nextKey(),
+            proposal,
+          }));
+          setItems([...loaded, ...pendingDiffs]);
           setChatSummary(data.chatSummary);
         }
       } finally {
@@ -324,6 +362,8 @@ export default function ChatPanel({ documentId, onAcceptDiff }: ChatPanelProps) 
                         className="inline-block h-4 w-2 animate-pulse bg-text-muted"
                         aria-label="Loading response"
                       />
+                    ) : item.role === "assistant" ? (
+                      <AssistantMessageContent content={item.content} />
                     ) : (
                       <p className="whitespace-pre-wrap">{item.content}</p>
                     )}

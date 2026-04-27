@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   DndContext,
   closestCenter,
@@ -266,6 +266,8 @@ interface ContextMenuState {
   name: string;
   x: number;
   y: number;
+  meta?: Record<string, unknown> | null;
+  docType?: string;
 }
 
 interface ModalState {
@@ -292,6 +294,7 @@ interface CanonIngestionState {
 interface NewDocumentState {
   storyId: string;
   storyName: string;
+  storyMode?: string;
 }
 
 // ── Context Menu ──────────────────────────────────────────────────────────────
@@ -302,12 +305,14 @@ function ContextMenuDropdown({
   onDelete,
   onClose,
   onImportCanon,
+  onDuplicateAsAu,
 }: {
   menu: ContextMenuState;
   onRename: () => void;
   onDelete: () => void;
   onClose: () => void;
   onImportCanon?: () => void;
+  onDuplicateAsAu?: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -342,6 +347,13 @@ function ContextMenuDropdown({
       )}
       {menu.type === "document" && (
         <>
+          {(menu.docType === "CHARACTER" || menu.docType === "WORLDBUILDING") &&
+            menu.meta?.isCanon === true &&
+            onDuplicateAsAu !== undefined && (
+              <button role="menuitem" className={menuItemClass} onClick={onDuplicateAsAu}>
+                Duplicate as AU
+              </button>
+            )}
           <a
             role="menuitem"
             href={`/api/export/document/${menu.id}/markdown`}
@@ -729,23 +741,28 @@ function NewProjectModal({
 function NewDocumentModal({
   storyId,
   storyName,
+  storyMode,
   onConfirm,
   onClose,
 }: {
   storyId: string;
   storyName: string;
-  onConfirm: (type: DocumentTypeValue, name: string) => void;
+  storyMode?: string;
+  onConfirm: (type: DocumentTypeValue, name: string, sourceText?: string) => void;
   onClose: () => void;
 }) {
   const [docType, setDocType] = useState<DocumentTypeValue>("CHARACTER");
   const [name, setName] = useState("");
+  const [sourceText, setSourceText] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const showSourceText = storyMode === "FANFIC" && docType === "CHARACTER";
 
   const submit = () => {
     const trimmed = name.trim();
     if (!trimmed) return;
     setSaving(true);
-    onConfirm(docType, trimmed);
+    onConfirm(docType, trimmed, showSourceText && sourceText.trim() ? sourceText.trim() : undefined);
   };
 
   return (
@@ -784,7 +801,7 @@ function NewDocumentModal({
           </div>
         </fieldset>
 
-        <div className="mb-6">
+        <div className="mb-4">
           <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-text-muted">
             Name
           </label>
@@ -801,6 +818,26 @@ function NewDocumentModal({
             aria-label="Document name"
           />
         </div>
+
+        {showSourceText && (
+          <div className="mb-6">
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-text-muted">
+              Source Material (optional)
+            </label>
+            <p className="mb-1.5 text-xs text-text-muted">
+              Paste wiki text or bios to pre-populate the document via AI diff.
+            </p>
+            <textarea
+              value={sourceText}
+              onChange={(e) => setSourceText(e.target.value)}
+              rows={4}
+              className="w-full resize-none rounded border border-border bg-background px-3 py-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-accent"
+              aria-label="Source material for character pre-population"
+            />
+          </div>
+        )}
+
+        {!showSourceText && <div className="mb-6" />}
 
         <div className="flex justify-end gap-2">
           <button
@@ -902,7 +939,13 @@ function SortableSceneList({
   depth: number;
   pathname: string;
   collapsed: boolean;
-  onContextMenu: (e: React.MouseEvent, id: string, name: string) => void;
+  onContextMenu: (
+    e: React.MouseEvent,
+    id: string,
+    name: string,
+    meta?: Record<string, unknown> | null,
+    docType?: string,
+  ) => void;
 }) {
   const [docs, setDocs] = useState(initialDocs);
 
@@ -947,7 +990,7 @@ function SortableSceneList({
             depth={depth}
             isActive={pathname === `/dashboard/documents/${doc.id}`}
             collapsed={collapsed}
-            onContextMenu={(e) => onContextMenu(e, doc.id, doc.name)}
+            onContextMenu={(e) => onContextMenu(e, doc.id, doc.name, doc.meta, doc.type)}
           />
         ))}
       </SortableContext>
@@ -964,6 +1007,7 @@ interface SidebarProps {
 
 export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [tree, setTree] = useState<ProjectTree | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -1023,10 +1067,12 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     id: string,
     type: NodeType,
     name: string,
+    meta?: Record<string, unknown> | null,
+    docType?: string,
   ) => {
     e.stopPropagation();
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setContextMenu({ id, type, name, x: rect.right + 4, y: rect.top });
+    setContextMenu({ id, type, name, x: rect.right + 4, y: rect.top, meta, docType });
   };
 
   const handleRename = async (name: string) => {
@@ -1053,14 +1099,40 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     storyId: string,
     type: DocumentTypeValue,
     name: string,
+    sourceText?: string,
   ) => {
-    await fetch("/api/documents", {
+    const res = await fetch("/api/documents", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type, name, storyId }),
     });
     setNewDocumentModal(null);
     fetchTree();
+
+    if (sourceText && res.ok) {
+      const created = (await res.json()) as { id: string };
+      const prepopRes = await fetch("/api/ai/prepopulate-character", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documentId: created.id, sourceText }),
+      });
+      if (prepopRes.ok) {
+        const data = (await prepopRes.json()) as { proposals: unknown[] };
+        if (Array.isArray(data.proposals) && data.proposals.length > 0) {
+          sessionStorage.setItem(`prepopulate-${created.id}`, JSON.stringify(data.proposals));
+        }
+      }
+      router.push(`/dashboard/documents/${created.id}`);
+    }
+  };
+
+  const handleDuplicateAsAu = async () => {
+    if (!contextMenu) return;
+    const res = await fetch(`/api/documents/${contextMenu.id}/duplicate`, {
+      method: "POST",
+    });
+    setContextMenu(null);
+    if (res.ok) fetchTree();
   };
 
   const handleCreate = async (data: CreateData) => {
@@ -1122,10 +1194,18 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               C
             </span>
           )}
+          {!collapsed && doc.meta?.isCanon === false && (
+            <span
+              className="shrink-0 rounded border border-indigo-200 bg-indigo-50 px-1 py-0.5 text-[10px] font-semibold leading-none text-indigo-700"
+              aria-label="AU variant"
+            >
+              AU
+            </span>
+          )}
         </Link>
         {!collapsed && (
           <button
-            onClick={(e) => openContextMenu(e, doc.id, "document", doc.name)}
+            onClick={(e) => openContextMenu(e, doc.id, "document", doc.name, doc.meta, doc.type)}
             className="invisible shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:visible"
             aria-label={`Options for ${doc.name}`}
             data-testid={`document-menu-${doc.id}`}
@@ -1171,8 +1251,8 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                 depth={depth}
                 pathname={pathname}
                 collapsed={collapsed}
-                onContextMenu={(e, id, name) =>
-                  openContextMenu(e, id, "document", name)
+                onContextMenu={(e, id, name, meta, docType) =>
+                  openContextMenu(e, id, "document", name, meta, docType)
                 }
               />
             </ul>
@@ -1218,7 +1298,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setNewDocumentModal({ storyId: story.id, storyName: story.name });
+                  setNewDocumentModal({ storyId: story.id, storyName: story.name, storyMode: story.mode });
                 }}
                 className="invisible shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:visible"
                 aria-label={`Add document to ${story.name}`}
@@ -1558,6 +1638,13 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                 }
               : undefined
           }
+          onDuplicateAsAu={
+            contextMenu.type === "document" &&
+            (contextMenu.docType === "CHARACTER" || contextMenu.docType === "WORLDBUILDING") &&
+            contextMenu.meta?.isCanon === true
+              ? () => void handleDuplicateAsAu()
+              : undefined
+          }
         />
       )}
 
@@ -1593,8 +1680,9 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         <NewDocumentModal
           storyId={newDocumentModal.storyId}
           storyName={newDocumentModal.storyName}
-          onConfirm={(type, name) =>
-            handleDocumentCreate(newDocumentModal.storyId, type, name)
+          storyMode={newDocumentModal.storyMode}
+          onConfirm={(type, name, sourceText) =>
+            void handleDocumentCreate(newDocumentModal.storyId, type, name, sourceText)
           }
           onClose={() => setNewDocumentModal(null)}
         />

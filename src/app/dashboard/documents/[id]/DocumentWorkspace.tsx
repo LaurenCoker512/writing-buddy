@@ -58,6 +58,17 @@ export default function DocumentWorkspace({
     initialParentDocumentName,
   );
   const [showParentSelector, setShowParentSelector] = useState(false);
+  const [initialDiffProposals] = useState<DiffProposal[]>(() => {
+    if (typeof window === "undefined") return [];
+    const stored = sessionStorage.getItem(`prepopulate-${documentId}`);
+    if (!stored) return [];
+    sessionStorage.removeItem(`prepopulate-${documentId}`);
+    try {
+      return JSON.parse(stored) as DiffProposal[];
+    } catch {
+      return [];
+    }
+  });
 
   const typeLabel = DOCUMENT_TYPE_LABELS[documentType as DocumentTypeValue] ?? documentType;
 
@@ -231,7 +242,13 @@ export default function DocumentWorkspace({
     <>
       <SplitView
         left={editorPanel}
-        right={<ChatPanel documentId={documentId} onAcceptDiff={handleAcceptDiff} />}
+        right={
+          <ChatPanel
+            documentId={documentId}
+            onAcceptDiff={handleAcceptDiff}
+            initialDiffProposals={initialDiffProposals}
+          />
+        }
       />
       {historyOpen && (
         <VersionHistoryPanel

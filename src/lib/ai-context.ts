@@ -78,12 +78,23 @@ export function buildTier1Context(
   return { documentMarkdown, recentMessages };
 }
 
+export function buildCanonContext(docs: SiblingDocument[]): string {
+  const withSummaries = docs.filter(
+    (doc): doc is SiblingDocument & { contentSummary: string } =>
+      doc.contentSummary !== null && doc.contentSummary.trim() !== "",
+  );
+  return withSummaries
+    .map((doc) => `### ${doc.name} (${doc.type})\n${doc.contentSummary}`)
+    .join("\n\n");
+}
+
 export function buildSystemPrompt(
   documentMarkdown: string,
   mode: string,
   rating: string,
   chatSummary?: string | null,
   tier2Context?: string | null,
+  canonContext?: string | null,
 ): string {
   const modeLabel = mode === "FANFIC" ? "fanfiction" : "original fiction";
   const ratingDesc = RATING_DESCRIPTIONS[rating] ?? "general";
@@ -91,10 +102,19 @@ export function buildSystemPrompt(
   const parts = [
     `You are a writing assistant helping with a ${modeLabel} story (rated ${rating} — ${ratingDesc}).`,
     "Your role is to help the writer develop characters, plot, worldbuilding, and prose. Be creative, collaborative, and responsive to the writer's vision.",
-    "",
-    "Current document:",
-    documentMarkdown || "(empty document)",
   ];
+
+  if (mode === "FANFIC" && canonContext) {
+    parts.push(
+      "",
+      "Canon reference documents (established facts from the source material):",
+      canonContext,
+      "",
+      "When citing information from the canon documents above, label it with [Canon]. When referencing AU (alternate universe) variations, label them with [AU].",
+    );
+  }
+
+  parts.push("", "Current document:", documentMarkdown || "(empty document)");
 
   if (tier2Context) {
     parts.push("", "Related documents in this story (summaries):", tier2Context);
