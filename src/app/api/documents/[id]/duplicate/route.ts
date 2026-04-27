@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { findOwnedDocument } from "@/lib/db-helpers";
 
 export async function POST(
   _req: NextRequest,
@@ -13,21 +14,8 @@ export async function POST(
 
   const { id } = await params;
 
-  const original = await prisma.document.findFirst({
-    where: { id },
-    include: {
-      story: { select: { userId: true } },
-      series: { select: { userId: true } },
-      universe: { select: { userId: true } },
-    },
-  });
-
+  const original = await findOwnedDocument(id, session.user.id);
   if (!original) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  const owner = original.story ?? original.series ?? original.universe;
-  if (!owner || owner.userId !== session.user.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

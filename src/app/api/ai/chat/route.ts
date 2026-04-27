@@ -7,25 +7,9 @@ import type { TipTapNode } from "@/lib/tiptap-to-markdown";
 import { AI_CONFIG } from "@/config/ai";
 import { shouldPruneChatMessages } from "@/lib/chat-pruning";
 import { ensureContentSummariesFresh } from "@/lib/content-summary";
-import { resolveAiProvider } from "@/lib/ai-provider";
+import { resolveProviderForUser } from "@/lib/ai-provider";
 import type { ProviderAdapter } from "@/lib/ai-provider";
-
-async function findOwnedDocument(id: string, userId: string) {
-  const document = await prisma.document.findFirst({
-    where: { id },
-    include: {
-      story: { select: { userId: true, mode: true, rating: true } },
-      series: { select: { userId: true, mode: true, rating: true } },
-      universe: { select: { userId: true, mode: true, rating: true } },
-    },
-  });
-  if (!document) return null;
-
-  const owner = document.story ?? document.series ?? document.universe;
-  if (!owner || owner.userId !== userId) return null;
-
-  return { document, owner };
-}
+import { findOwnedDocument } from "@/lib/db-helpers";
 
 async function pruneMessages(documentId: string, provider: ProviderAdapter): Promise<void> {
   const oldest = await prisma.chatMessage.findMany({
@@ -85,19 +69,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const result = await findOwnedDocument(body.documentId, session.user.id);
-  if (!result) {
+  const document = await findOwnedDocument(body.documentId, session.user.id);
+  if (!document) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const { document, owner } = result;
+  // owner is guaranteed non-null: findOwnedDocument only returns when a valid owner was found
+  const owner = (document.story ?? document.series ?? document.universe)!;
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { openRouterKey: true, anthropicKey: true, aiProvider: true, anthropicModel: true, explicitEnabled: true },
-  });
+  const [providerResult, userSettings] = await Promise.all([
+    resolveProviderForUser(session.user.id),
+    prisma.user.findUnique({ where: { id: session.user.id }, select: { explicitEnabled: true } }),
+  ]);
 
-  const providerResult = resolveAiProvider(user ?? { openRouterKey: null, anthropicKey: null, aiProvider: null });
   if (!providerResult.ok) {
     return NextResponse.json(
       { error: providerResult.error, message: providerResult.message },
@@ -190,7 +174,7 @@ export async function POST(req: NextRequest) {
     document.chatSummary,
     tier2Context || null,
     canonContext,
-    user?.explicitEnabled ?? false,
+    userSettings?.explicitEnabled ?? false,
   );
 
   let providerStream: ReadableStream<Uint8Array>;
@@ -234,16 +218,20 @@ export async function POST(req: NextRequest) {
         controller.enqueue(value);
       }
 
-      await prisma.chatMessage.createMany({
-        data: [
-          { documentId, role: "user", content: userContent },
-          { documentId, role: "assistant", content: assistantContent },
-        ],
-      });
+      try {
+        await prisma.chatMessage.createMany({
+          data: [
+            { documentId, role: "user", content: userContent },
+            { documentId, role: "assistant", content: assistantContent },
+          ],
+        });
 
-      const count = await prisma.chatMessage.count({ where: { documentId } });
-      if (shouldPruneChatMessages(count)) {
-        await pruneMessages(documentId, provider);
+        const count = await prisma.chatMessage.count({ where: { documentId } });
+        if (shouldPruneChatMessages(count)) {
+          await pruneMessages(documentId, provider);
+        }
+      } catch (err) {
+        console.error("[chat] Failed to persist messages after stream:", err);
       }
 
       controller.close();

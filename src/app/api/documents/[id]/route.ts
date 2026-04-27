@@ -2,26 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
+import { findOwnedDocument } from "@/lib/db-helpers";
 
 type Params = { params: { id: string } };
-
-async function findOwnedDocument(id: string, userId: string) {
-  const document = await prisma.document.findFirst({
-    where: { id },
-    include: {
-      story: { select: { userId: true } },
-      series: { select: { userId: true } },
-      universe: { select: { userId: true } },
-    },
-  });
-  if (!document) return null;
-
-  const ownerId =
-    document.story?.userId ?? document.series?.userId ?? document.universe?.userId;
-  if (ownerId !== userId) return null;
-
-  return document;
-}
 
 export async function GET(_req: NextRequest, { params }: Params) {
   const session = await auth();

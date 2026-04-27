@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { decryptApiKey } from "@/lib/encryption";
 import { AI_CONFIG } from "@/config/ai";
+import { prisma } from "@/lib/prisma";
 
 export interface AiMessage {
   role: "user" | "assistant";
@@ -134,6 +135,14 @@ export class AnthropicProvider implements ProviderAdapter {
 /** Strips markdown code fences (```json ... ``` or ``` ... ```) from AI responses before JSON.parse. */
 export function stripJsonFences(raw: string): string {
   return raw.replace(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i, "$1").trim();
+}
+
+export async function resolveProviderForUser(userId: string): Promise<AiProviderResolution> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { openRouterKey: true, anthropicKey: true, aiProvider: true, anthropicModel: true },
+  });
+  return resolveAiProvider(user ?? { openRouterKey: null, anthropicKey: null, aiProvider: null });
 }
 
 export function resolveAiProvider(user: {

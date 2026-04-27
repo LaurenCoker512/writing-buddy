@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { tiptapToMarkdown } from "@/lib/tiptap-to-markdown";
 import type { TipTapNode } from "@/lib/tiptap-to-markdown";
 import { estimateContradictionTokens } from "@/lib/contradiction";
-import { resolveAiProvider, stripJsonFences } from "@/lib/ai-provider";
+import { resolveProviderForUser, stripJsonFences } from "@/lib/ai-provider";
 
 interface AiIssueRaw {
   description: unknown;
@@ -79,12 +79,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ tokenEstimate });
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { openRouterKey: true, anthropicKey: true, aiProvider: true, anthropicModel: true },
-  });
-
-  const providerResult = resolveAiProvider(user ?? { openRouterKey: null, anthropicKey: null, aiProvider: null });
+  const providerResult = await resolveProviderForUser(session.user.id);
   if (!providerResult.ok) {
     return NextResponse.json(
       { error: providerResult.error, message: providerResult.message },

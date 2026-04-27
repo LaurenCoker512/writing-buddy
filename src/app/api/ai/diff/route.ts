@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+
 import { tiptapToMarkdown } from "@/lib/tiptap-to-markdown";
 import { getSectionMarkdown } from "@/lib/section-utils";
 import type { TipTapNode } from "@/lib/tiptap-to-markdown";
 import type { TipTapDoc } from "@/lib/section-utils";
 import type { DiffProposal } from "@/types/diff";
-import { resolveAiProvider, stripJsonFences } from "@/lib/ai-provider";
+import { resolveProviderForUser, stripJsonFences } from "@/lib/ai-provider";
+import { findOwnedDocument } from "@/lib/db-helpers";
 
 interface AiDiffItem {
   heading: unknown;
@@ -47,23 +48,6 @@ Rules:
 - Preserve content in the section you are not asked to change
 - Return valid JSON only — no other text`;
 
-async function findOwnedDocument(id: string, userId: string) {
-  const document = await prisma.document.findFirst({
-    where: { id },
-    include: {
-      story: { select: { userId: true, mode: true, rating: true } },
-      series: { select: { userId: true, mode: true, rating: true } },
-      universe: { select: { userId: true, mode: true, rating: true } },
-    },
-  });
-  if (!document) return null;
-
-  const owner = document.story ?? document.series ?? document.universe;
-  if (!owner || owner.userId !== userId) return null;
-
-  return { document, owner };
-}
-
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -76,19 +60,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const result = await findOwnedDocument(body.documentId, session.user.id);
-  if (!result) {
+  const document = await findOwnedDocument(body.documentId, session.user.id);
+  if (!document) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const { document } = result;
-
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { openRouterKey: true, anthropicKey: true, aiProvider: true, anthropicModel: true },
-  });
-
-  const providerResult = resolveAiProvider(user ?? { openRouterKey: null, anthropicKey: null, aiProvider: null });
+  const providerResult = await resolveProviderForUser(session.user.id);
   if (!providerResult.ok) {
     return NextResponse.json(
       { error: providerResult.error, message: providerResult.message },

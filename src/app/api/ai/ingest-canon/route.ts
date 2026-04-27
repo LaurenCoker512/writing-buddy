@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { resolveAiProvider, stripJsonFences } from "@/lib/ai-provider";
+import { resolveProviderForUser, stripJsonFences } from "@/lib/ai-provider";
 import type { CanonProposal } from "@/types/diff";
 
 interface AiCanonItem {
@@ -65,12 +65,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Universe not found" }, { status: 404 });
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { openRouterKey: true, anthropicKey: true, aiProvider: true, anthropicModel: true },
-  });
-
-  const providerResult = resolveAiProvider(user ?? { openRouterKey: null, anthropicKey: null, aiProvider: null });
+  const providerResult = await resolveProviderForUser(session.user.id);
   if (!providerResult.ok) {
     return NextResponse.json(
       { error: providerResult.error, message: providerResult.message },

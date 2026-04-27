@@ -113,21 +113,12 @@ export default function CanonIngestionModal({
         name: proposal.documentName,
         type: proposal.documentType,
         universeId,
-      }),
-    });
-
-    if (!createRes.ok) return;
-
-    const created = (await createRes.json()) as { id: string };
-
-    await fetch(`/api/documents/${created.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
         tiptapJson,
         meta: { isCanon: true },
       }),
     });
+
+    if (!createRes.ok) return;
 
     setProposals((prev) => prev?.filter((p) => p.id !== proposal.id) ?? null);
     onDocumentsCreated();

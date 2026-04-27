@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
 import { tiptapToMarkdown } from "@/lib/tiptap-to-markdown";
 import type { TipTapNode } from "@/lib/tiptap-to-markdown";
+import { findOwnedDocument } from "@/lib/db-helpers";
 import React from "react";
 import {
   Document,
@@ -14,21 +14,6 @@ import {
 } from "@react-pdf/renderer";
 
 type Params = { params: { id: string } };
-
-async function findOwnedDocument(id: string, userId: string) {
-  const document = await prisma.document.findFirst({
-    where: { id },
-    include: {
-      story: { select: { userId: true } },
-      series: { select: { userId: true } },
-      universe: { select: { userId: true } },
-    },
-  });
-  if (!document) return null;
-  const ownerId =
-    document.story?.userId ?? document.series?.userId ?? document.universe?.userId;
-  return ownerId === userId ? document : null;
-}
 
 const styles = StyleSheet.create({
   page: { padding: 56, fontFamily: "Helvetica" },

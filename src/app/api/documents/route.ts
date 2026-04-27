@@ -91,14 +91,27 @@ export async function POST(req: NextRequest) {
     if (!universe) return NextResponse.json({ error: "Universe not found" }, { status: 404 });
   }
 
+  const tiptapJson =
+    typeof body.tiptapJson === "object" &&
+    body.tiptapJson !== null &&
+    !Array.isArray(body.tiptapJson)
+      ? (body.tiptapJson as Prisma.InputJsonValue)
+      : (buildTemplate(body.type) as unknown as Prisma.InputJsonValue);
+
+  const meta =
+    typeof body.meta === "object" && body.meta !== null && !Array.isArray(body.meta)
+      ? (body.meta as Prisma.InputJsonValue)
+      : undefined;
+
   const document = await prisma.document.create({
     data: {
       type: body.type,
       name: body.name.trim(),
-      tiptapJson: buildTemplate(body.type) as unknown as Prisma.InputJsonValue,
+      tiptapJson,
       storyId,
       seriesId,
       universeId,
+      ...(meta !== undefined ? { meta } : {}),
     },
   });
 
