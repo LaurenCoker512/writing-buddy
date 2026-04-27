@@ -8,6 +8,7 @@ import SplitView from "@/components/SplitView";
 import ChatPanel from "@/components/ChatPanel";
 import VersionHistoryPanel from "@/components/VersionHistoryPanel";
 import DocumentMetaBar from "@/components/DocumentMetaBar";
+import ContradictionCheckerModal from "@/components/ContradictionCheckerModal";
 import { replaceSectionInTipTap, appendSectionToTipTap } from "@/lib/section-utils";
 import type { TipTapDoc } from "@/lib/section-utils";
 import { markdownToTipTapNodes } from "@/lib/markdown-to-tiptap";
@@ -30,6 +31,7 @@ interface DocumentWorkspaceProps {
   documentType: string;
   initialJson: object;
   initialMeta: Record<string, unknown> | null;
+  storyId: string | null;
   parentDocumentId: string | null;
   parentDocumentName: string | null;
   parentCandidates: { id: string; name: string }[];
@@ -41,6 +43,7 @@ export default function DocumentWorkspace({
   documentType,
   initialJson,
   initialMeta,
+  storyId,
   parentDocumentId: initialParentDocumentId,
   parentDocumentName: initialParentDocumentName,
   parentCandidates,
@@ -50,6 +53,7 @@ export default function DocumentWorkspace({
     { json: object; nonce: number } | undefined
   >();
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [contradictionOpen, setContradictionOpen] = useState(false);
   const [versionKey, setVersionKey] = useState(0);
   const [parentDocumentId, setParentDocumentId] = useState<string | null>(
     initialParentDocumentId,
@@ -138,7 +142,18 @@ export default function DocumentWorkspace({
               [C]
             </span>
           )}
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-1">
+            {storyId !== null && (
+              <button
+                type="button"
+                onClick={() => setContradictionOpen(true)}
+                aria-label="Check for contradictions"
+                data-testid="contradiction-checker-button"
+                className="rounded px-2 py-1 text-sm text-text-muted transition-colors hover:bg-background hover:text-text-primary"
+              >
+                Contradictions
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setHistoryOpen(true)}
@@ -256,6 +271,12 @@ export default function DocumentWorkspace({
           versionKey={versionKey}
           onClose={() => setHistoryOpen(false)}
           onRestore={handleRestore}
+        />
+      )}
+      {contradictionOpen && storyId !== null && (
+        <ContradictionCheckerModal
+          storyId={storyId}
+          onClose={() => setContradictionOpen(false)}
         />
       )}
     </>

@@ -34,6 +34,7 @@ import {
 } from "@/lib/documents";
 import { calculateInsertOrder } from "@/lib/scene-order";
 import CanonIngestionModal from "@/components/CanonIngestionModal";
+import ContradictionCheckerModal from "@/components/ContradictionCheckerModal";
 import { shouldShowAgeGate } from "@/lib/age-gate";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -307,6 +308,7 @@ function ContextMenuDropdown({
   onClose,
   onImportCanon,
   onDuplicateAsAu,
+  onCheckContradictions,
 }: {
   menu: ContextMenuState;
   onRename: () => void;
@@ -314,6 +316,7 @@ function ContextMenuDropdown({
   onClose: () => void;
   onImportCanon?: () => void;
   onDuplicateAsAu?: () => void;
+  onCheckContradictions?: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -344,6 +347,11 @@ function ContextMenuDropdown({
       {menu.type === "universe" && onImportCanon !== undefined && (
         <button role="menuitem" className={menuItemClass} onClick={onImportCanon}>
           Import Canon Text
+        </button>
+      )}
+      {menu.type === "story" && onCheckContradictions !== undefined && (
+        <button role="menuitem" className={menuItemClass} onClick={onCheckContradictions}>
+          Check for Contradictions
         </button>
       )}
       {menu.type === "document" && (
@@ -1112,6 +1120,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const [newProjectModal, setNewProjectModal] = useState(false);
   const [newDocumentModal, setNewDocumentModal] = useState<NewDocumentState | null>(null);
   const [canonIngestionModal, setCanonIngestionModal] = useState<CanonIngestionState | null>(null);
+  const [contradictionModal, setContradictionModal] = useState<{ storyId: string; storyName: string } | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem("sidebar-collapsed");
@@ -1739,6 +1748,14 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               ? () => void handleDuplicateAsAu()
               : undefined
           }
+          onCheckContradictions={
+            contextMenu.type === "story"
+              ? () => {
+                  setContradictionModal({ storyId: contextMenu.id, storyName: contextMenu.name });
+                  setContextMenu(null);
+                }
+              : undefined
+          }
         />
       )}
 
@@ -1789,6 +1806,15 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           universeName={canonIngestionModal.universeName}
           onClose={() => setCanonIngestionModal(null)}
           onDocumentsCreated={fetchTree}
+        />
+      )}
+
+      {/* Contradiction checker modal */}
+      {contradictionModal !== null && (
+        <ContradictionCheckerModal
+          storyId={contradictionModal.storyId}
+          storyName={contradictionModal.storyName}
+          onClose={() => setContradictionModal(null)}
         />
       )}
     </>

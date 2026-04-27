@@ -580,7 +580,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 23: Contradiction Checker ☐
+## Phase 23: Contradiction Checker ✅
 
 **Goal:** Writers can run an on-demand AI contradiction check across their Story documents with token transparency.
 
