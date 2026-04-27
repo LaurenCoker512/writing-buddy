@@ -1,4 +1,5 @@
 import { AI_CONFIG } from "@/config/ai";
+import type { ProviderAdapter } from "@/lib/ai-provider";
 
 export interface BrainstormRequest {
   mode: "ORIGINAL" | "FANFIC";
@@ -9,10 +10,6 @@ export interface BrainstormRequest {
 export interface LoglineCard {
   id: string;
   text: string;
-}
-
-interface OpenRouterResponse {
-  choices?: Array<{ message?: { content?: string } }>;
 }
 
 export function parseLoglines(content: string, count: number): string[] {
@@ -48,31 +45,9 @@ Format your response as a numbered list with exactly ${count} items. Each item o
 
 export async function generateLoglines(
   req: BrainstormRequest,
-  apiKey: string,
+  provider: ProviderAdapter,
 ): Promise<string[]> {
   const prompt = buildBrainstormPrompt(req);
-
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://writing-buddy.app",
-      "X-Title": "Writing Buddy",
-    },
-    body: JSON.stringify({
-      model: AI_CONFIG.OPENROUTER_DEFAULT_MODEL,
-      stream: false,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
-
-  if (!res.ok) {
-    throw new Error(`OpenRouter error: ${res.status}`);
-  }
-
-  const data = (await res.json()) as OpenRouterResponse;
-  const content = data.choices?.[0]?.message?.content ?? "";
-
+  const content = await provider.completeChat([{ role: "user", content: prompt }], "");
   return parseLoglines(content, AI_CONFIG.BRAINSTORM_LOGLINE_COUNT);
 }

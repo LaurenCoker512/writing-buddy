@@ -223,6 +223,7 @@ describe("POST /api/ai/chat — summarization", () => {
       (mockFetch.mock.calls[1] as [string, { body: string }])[1].body,
     ) as { messages: Array<{ content: string }> };
 
-    expect(summaryFetchBody.messages[0].content).toContain("Previous summary text");
+    const userMsg = summaryFetchBody.messages.find((m) => (m as { role?: string }).role === "user");
+    expect(userMsg?.content).toContain("Previous summary text");
   });
 });

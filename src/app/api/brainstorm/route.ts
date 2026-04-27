@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { decryptApiKey } from "@/lib/encryption";
 import { generateLoglines } from "@/lib/brainstorm";
+import { resolveAiProvider } from "@/lib/ai-provider";
 import type { BrainstormRequest } from "@/lib/brainstorm";
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -32,22 +32,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { openRouterKey: true },
+    select: { openRouterKey: true, anthropicKey: true, aiProvider: true },
   });
 
-  if (!user?.openRouterKey) {
+  const providerResult = resolveAiProvider(user ?? { openRouterKey: null, anthropicKey: null, aiProvider: null });
+  if (!providerResult.ok) {
     return NextResponse.json(
-      {
-        error: "no_api_key",
-        message: "Add your OpenRouter API key in Settings to use AI features.",
-      },
+      { error: providerResult.error, message: providerResult.message },
       { status: 402 },
     );
   }
 
-  const apiKey = decryptApiKey(user.openRouterKey);
-
-  const loglines = await generateLoglines(brainstormReq, apiKey);
+  const loglines = await generateLoglines(brainstormReq, providerResult.provider);
 
   return NextResponse.json({ loglines });
 }

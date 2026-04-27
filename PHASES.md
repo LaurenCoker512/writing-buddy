@@ -606,7 +606,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 24: Anthropic API Provider ☐
+## Phase 24: Anthropic API Provider ✅
 
 **Goal:** Users can choose to supply an Anthropic API key instead of an OpenRouter key, with all AI features working identically through a unified provider adapter.
 

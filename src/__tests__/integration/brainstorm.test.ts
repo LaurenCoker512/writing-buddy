@@ -114,6 +114,7 @@ describe("POST /api/brainstorm", () => {
       (mockFetch.mock.calls[0] as [string, { body: string }])[1].body,
     ) as { messages: Array<{ role: string; content: string }> };
 
-    expect(fetchBody.messages[0]?.content).toContain("Time travel romance");
+    const userMsg = fetchBody.messages.find((m) => m.role === "user");
+    expect(userMsg?.content).toContain("Time travel romance");
   });
 });

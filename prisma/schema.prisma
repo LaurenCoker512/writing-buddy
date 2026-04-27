@@ -35,6 +35,11 @@ enum Rating {
   E
 }
 
+enum AiProvider {
+  OPENROUTER
+  ANTHROPIC
+}
+
 // ---------------------------------------------------------------------------
 // Core models
 // ---------------------------------------------------------------------------
@@ -45,6 +50,8 @@ model User {
   name            String?
   passwordHash    String?
   openRouterKey   String?       // AES-256-GCM encrypted; never sent to client
+  anthropicKey    String?       // AES-256-GCM encrypted; never sent to client
+  aiProvider      AiProvider    @default(OPENROUTER)
   explicitEnabled Boolean       @default(false)
   createdAt       DateTime      @default(now())
 

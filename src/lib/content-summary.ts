@@ -1,8 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { tiptapToMarkdown } from "@/lib/tiptap-to-markdown";
 import type { TipTapNode } from "@/lib/tiptap-to-markdown";
-import { AI_CONFIG } from "@/config/ai";
 import type { SiblingDocument } from "@/lib/ai-context";
+import type { ProviderAdapter } from "@/lib/ai-provider";
 
 type SiblingDocRecord = SiblingDocument & {
   updatedAt: Date;
@@ -12,31 +12,16 @@ type SiblingDocRecord = SiblingDocument & {
 async function generateSummary(
   markdown: string,
   name: string,
-  apiKey: string,
+  provider: ProviderAdapter,
 ): Promise<string | null> {
   const prompt = `Summarize the following story document in 2-4 sentences. Focus on the most important details for writing assistance context.\n\nDocument: "${name}"\n\n${markdown || "(empty)"}\n\nSummary:`;
 
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://writing-buddy.app",
-      "X-Title": "Writing Buddy",
-    },
-    body: JSON.stringify({
-      model: AI_CONFIG.OPENROUTER_DEFAULT_MODEL,
-      stream: false,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
-
-  if (!res.ok) return null;
-
-  const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  return data.choices?.[0]?.message?.content ?? null;
+  try {
+    const summary = await provider.completeChat([{ role: "user", content: prompt }], "");
+    return summary || null;
+  } catch {
+    return null;
+  }
 }
 
 function isStale(doc: SiblingDocRecord): boolean {
@@ -49,7 +34,7 @@ function isStale(doc: SiblingDocRecord): boolean {
 
 export async function ensureContentSummariesFresh(
   documentIds: string[],
-  apiKey: string,
+  provider: ProviderAdapter,
 ): Promise<SiblingDocument[]> {
   if (documentIds.length === 0) return [];
 
@@ -71,7 +56,7 @@ export async function ensureContentSummariesFresh(
   await Promise.all(
     stale.map(async (doc) => {
       const markdown = tiptapToMarkdown(doc.tiptapJson as TipTapNode);
-      const summary = await generateSummary(markdown, doc.name, apiKey);
+      const summary = await generateSummary(markdown, doc.name, provider);
       if (summary === null) return;
 
       await prisma.document.update({

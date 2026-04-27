@@ -2,16 +2,26 @@
 
 import { useState } from "react";
 
+type ProviderType = "OPENROUTER" | "ANTHROPIC";
+
 interface ApiKeyFormProps {
-  hasKey: boolean;
+  hasOpenRouterKey: boolean;
+  hasAnthropicKey: boolean;
+  activeProvider: ProviderType;
 }
 
-export default function ApiKeyForm({ hasKey }: ApiKeyFormProps) {
+export default function ApiKeyForm({
+  hasOpenRouterKey,
+  hasAnthropicKey,
+  activeProvider,
+}: ApiKeyFormProps) {
+  const [selectedProvider, setSelectedProvider] = useState<ProviderType>(activeProvider);
   const [apiKey, setApiKey] = useState("");
-  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">(
-    "idle"
-  );
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const hasKeyForSelected =
+    selectedProvider === "OPENROUTER" ? hasOpenRouterKey : hasAnthropicKey;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -21,7 +31,7 @@ export default function ApiKeyForm({ hasKey }: ApiKeyFormProps) {
     const response = await fetch("/api/settings/api-key", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ apiKey }),
+      body: JSON.stringify({ apiKey, provider: selectedProvider }),
     });
 
     if (response.ok) {
@@ -37,24 +47,46 @@ export default function ApiKeyForm({ hasKey }: ApiKeyFormProps) {
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="font-heading text-xl font-semibold text-text-primary">
-          OpenRouter API Key
-        </h2>
+        <h2 className="font-heading text-xl font-semibold text-text-primary">AI Provider</h2>
         <p className="mt-1 text-sm text-text-muted">
-          {hasKey || status === "saved"
-            ? "A key is currently configured. Enter a new value to replace it."
-            : "Enter your OpenRouter API key to enable AI features."}
+          Choose your AI provider and enter the corresponding API key.
         </p>
+      </div>
+
+      <div className="flex gap-3">
+        {(["OPENROUTER", "ANTHROPIC"] as ProviderType[]).map((p) => (
+          <label
+            key={p}
+            className="flex cursor-pointer items-center gap-2 rounded border border-border bg-surface px-4 py-2 text-sm text-text-primary transition-colors has-[:checked]:border-accent has-[:checked]:bg-accent/10"
+          >
+            <input
+              type="radio"
+              name="provider"
+              value={p}
+              checked={selectedProvider === p}
+              onChange={() => {
+                setSelectedProvider(p);
+                setStatus("idle");
+                setApiKey("");
+                setErrorMessage(null);
+              }}
+              className="accent-accent"
+            />
+            {p === "OPENROUTER" ? "OpenRouter" : "Anthropic"}
+          </label>
+        ))}
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3">
         <div className="space-y-1">
-          <label
-            htmlFor="api-key"
-            className="block text-sm font-medium text-text-primary"
-          >
-            API key
+          <label htmlFor="api-key" className="block text-sm font-medium text-text-primary">
+            {selectedProvider === "OPENROUTER" ? "OpenRouter API key" : "Anthropic API key"}
           </label>
+          <p className="text-xs text-text-muted">
+            {hasKeyForSelected || status === "saved"
+              ? "A key is currently configured. Enter a new value to replace it."
+              : `Enter your ${selectedProvider === "OPENROUTER" ? "OpenRouter" : "Anthropic"} API key to enable AI features.`}
+          </p>
           <input
             id="api-key"
             type="password"
@@ -62,7 +94,7 @@ export default function ApiKeyForm({ hasKey }: ApiKeyFormProps) {
             required
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            placeholder="sk-or-…"
+            placeholder={selectedProvider === "OPENROUTER" ? "sk-or-…" : "sk-ant-…"}
             className="w-full rounded border border-border bg-surface px-3 py-2 text-text-primary focus:outline-none focus:ring-2 focus:ring-accent"
           />
         </div>
@@ -75,7 +107,7 @@ export default function ApiKeyForm({ hasKey }: ApiKeyFormProps) {
 
         {status === "saved" && (
           <p role="status" className="text-sm text-green-700">
-            {hasKey ? "Key updated." : "Key saved."}
+            {hasKeyForSelected ? "Key updated." : "Key saved."}
           </p>
         )}
 
@@ -84,7 +116,7 @@ export default function ApiKeyForm({ hasKey }: ApiKeyFormProps) {
           disabled={status === "saving"}
           className="rounded bg-accent px-4 py-2 font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-60"
         >
-          {status === "saving" ? "Saving…" : hasKey ? "Update key" : "Save key"}
+          {status === "saving" ? "Saving…" : hasKeyForSelected ? "Update key" : "Save key"}
         </button>
       </form>
     </section>

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { decryptApiKey } from "@/lib/encryption";
 import { buildTier1Context, buildSystemPrompt, buildTier2Context, buildCanonContext } from "@/lib/ai-context";
 import type { ChatMessage } from "@/lib/ai-context";
 import type { TipTapNode } from "@/lib/tiptap-to-markdown";
 import { AI_CONFIG } from "@/config/ai";
 import { shouldPruneChatMessages } from "@/lib/chat-pruning";
 import { ensureContentSummariesFresh } from "@/lib/content-summary";
+import { resolveAiProvider } from "@/lib/ai-provider";
+import type { ProviderAdapter } from "@/lib/ai-provider";
 
 async function findOwnedDocument(id: string, userId: string) {
   const document = await prisma.document.findFirst({
@@ -26,7 +27,7 @@ async function findOwnedDocument(id: string, userId: string) {
   return { document, owner };
 }
 
-async function pruneMessages(documentId: string, apiKey: string): Promise<void> {
+async function pruneMessages(documentId: string, provider: ProviderAdapter): Promise<void> {
   const oldest = await prisma.chatMessage.findMany({
     where: { documentId },
     orderBy: { createdAt: "asc" },
@@ -49,27 +50,14 @@ async function pruneMessages(documentId: string, apiKey: string): Promise<void> 
     ? `You are summarizing a conversation. Update the existing summary with new messages.\n\nExisting summary:\n${previousSummary}\n\nNew messages to incorporate:\n${messageText}\n\nProvide an updated concise summary:`
     : `Summarize this conversation concisely, capturing key points and decisions:\n\n${messageText}\n\nSummary:`;
 
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://writing-buddy.app",
-      "X-Title": "Writing Buddy",
-    },
-    body: JSON.stringify({
-      model: AI_CONFIG.OPENROUTER_DEFAULT_MODEL,
-      stream: false,
-      messages: [{ role: "user", content: summaryPrompt }],
-    }),
-  });
+  let newSummary: string;
+  try {
+    newSummary = await provider.completeChat([{ role: "user", content: summaryPrompt }], "");
+  } catch {
+    return;
+  }
 
-  if (!res.ok) return;
-
-  const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const newSummary = data.choices?.[0]?.message?.content ?? previousSummary;
+  if (!newSummary) return;
 
   await prisma.$transaction([
     prisma.document.update({
@@ -106,25 +94,18 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { openRouterKey: true, explicitEnabled: true },
+    select: { openRouterKey: true, anthropicKey: true, aiProvider: true, explicitEnabled: true },
   });
 
-  if (!user?.openRouterKey) {
+  const providerResult = resolveAiProvider(user ?? { openRouterKey: null, anthropicKey: null, aiProvider: null });
+  if (!providerResult.ok) {
     return NextResponse.json(
-      {
-        error: "no_api_key",
-        message: "Add your OpenRouter API key in Settings to use AI features.",
-      },
+      { error: providerResult.error, message: providerResult.message },
       { status: 402 },
     );
   }
 
-  let apiKey: string;
-  try {
-    apiKey = decryptApiKey(user.openRouterKey);
-  } catch {
-    return NextResponse.json({ error: "Failed to decrypt API key" }, { status: 500 });
-  }
+  const { provider } = providerResult;
 
   const dbMessages = await prisma.chatMessage.findMany({
     where: { documentId: body.documentId },
@@ -153,13 +134,12 @@ export async function POST(req: NextRequest) {
               select: { id: true },
             })
             .then((docs) => docs.map((d) => d.id)),
-          apiKey,
+          provider,
         )
       : [];
 
   const tier2Context = buildTier2Context(freshSiblings, document.type);
 
-  // For FANFIC mode: build canon context from Universe-level isCanon documents
   let canonContext: string | null = null;
   if (owner.mode === "FANFIC") {
     let universeId: string | null = document.universeId ?? null;
@@ -191,7 +171,7 @@ export async function POST(req: NextRequest) {
         .map((d) => d.id);
 
       if (canonDocIds.length > 0) {
-        const freshCanonDocs = await ensureContentSummariesFresh(canonDocIds, apiKey);
+        const freshCanonDocs = await ensureContentSummariesFresh(canonDocIds, provider);
         const ctx = buildCanonContext(freshCanonDocs);
         if (ctx) canonContext = ctx;
       }
@@ -210,41 +190,17 @@ export async function POST(req: NextRequest) {
     document.chatSummary,
     tier2Context || null,
     canonContext,
-    user.explicitEnabled,
+    user?.explicitEnabled ?? false,
   );
 
-  const openRouterResponse = await fetch(
-    "https://openrouter.ai/api/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://writing-buddy.app",
-        "X-Title": "Writing Buddy",
-      },
-      body: JSON.stringify({
-        model: AI_CONFIG.OPENROUTER_DEFAULT_MODEL,
-        stream: true,
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...recentMessages,
-          { role: "user", content: body.content },
-        ],
-      }),
-    },
-  );
-
-  if (!openRouterResponse.ok) {
-    const errorText = await openRouterResponse.text();
-    return NextResponse.json(
-      { error: "OpenRouter API error", details: errorText },
-      { status: 502 },
+  let providerStream: ReadableStream<Uint8Array>;
+  try {
+    providerStream = await provider.streamChat(
+      [...recentMessages, { role: "user" as const, content: body.content }],
+      systemPrompt,
     );
-  }
-
-  if (!openRouterResponse.body) {
-    return NextResponse.json({ error: "No response body" }, { status: 502 });
+  } catch {
+    return NextResponse.json({ error: "AI provider error" }, { status: 502 });
   }
 
   const documentId = body.documentId;
@@ -253,7 +209,7 @@ export async function POST(req: NextRequest) {
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const reader = openRouterResponse.body!.getReader();
+      const reader = providerStream.getReader();
       let assistantContent = "";
 
       while (true) {
@@ -287,7 +243,7 @@ export async function POST(req: NextRequest) {
 
       const count = await prisma.chatMessage.count({ where: { documentId } });
       if (shouldPruneChatMessages(count)) {
-        await pruneMessages(documentId, apiKey);
+        await pruneMessages(documentId, provider);
       }
 
       controller.close();

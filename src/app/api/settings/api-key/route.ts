@@ -9,17 +9,21 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = (await req.json()) as { apiKey?: unknown };
+  const body = (await req.json()) as { apiKey?: unknown; provider?: unknown };
 
   if (typeof body.apiKey !== "string" || body.apiKey.trim() === "") {
     return NextResponse.json({ error: "API key is required" }, { status: 400 });
   }
 
+  const provider = body.provider === "ANTHROPIC" ? "ANTHROPIC" : "OPENROUTER";
   const encryptedKey = encryptApiKey(body.apiKey.trim());
 
   await prisma.user.update({
     where: { id: session.user.id },
-    data: { openRouterKey: encryptedKey },
+    data:
+      provider === "ANTHROPIC"
+        ? { anthropicKey: encryptedKey, aiProvider: "ANTHROPIC" }
+        : { openRouterKey: encryptedKey, aiProvider: "OPENROUTER" },
   });
 
   return NextResponse.json({ message: "API key saved" });

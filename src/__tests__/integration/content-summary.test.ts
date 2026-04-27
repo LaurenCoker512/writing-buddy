@@ -11,16 +11,17 @@ const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 import { ensureContentSummariesFresh } from "@/lib/content-summary";
+import { OpenRouterProvider } from "@/lib/ai-provider";
 import { prisma } from "@/lib/prisma";
 
 const mockFindMany = prisma.document.findMany as jest.Mock;
 const mockUpdate = prisma.document.update as jest.Mock;
 
-const API_KEY = "test-api-key";
+const provider = new OpenRouterProvider("test-api-key");
 const NOW = new Date("2024-01-10T12:00:00Z");
 const OLDER = new Date("2024-01-09T12:00:00Z");
 
-function makeSseResponse(content: string): Response {
+function makeAiResponse(content: string): Response {
   return {
     ok: true,
     json: async () => ({
@@ -36,7 +37,7 @@ describe("ensureContentSummariesFresh", () => {
   });
 
   test("returns empty array when given no document ids", async () => {
-    const result = await ensureContentSummariesFresh([], API_KEY);
+    const result = await ensureContentSummariesFresh([], provider);
     expect(result).toEqual([]);
     expect(mockFindMany).not.toHaveBeenCalled();
   });
@@ -53,9 +54,9 @@ describe("ensureContentSummariesFresh", () => {
         updatedAt: NOW,
       },
     ]);
-    mockFetch.mockResolvedValue(makeSseResponse("Aria is a rogue."));
+    mockFetch.mockResolvedValue(makeAiResponse("Aria is a rogue."));
 
-    const result = await ensureContentSummariesFresh(["doc-1"], API_KEY);
+    const result = await ensureContentSummariesFresh(["doc-1"], provider);
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(mockUpdate).toHaveBeenCalledWith(
@@ -64,7 +65,7 @@ describe("ensureContentSummariesFresh", () => {
         data: expect.objectContaining({ contentSummary: "Aria is a rogue." }),
       }),
     );
-    expect(result[0].contentSummary).toBe("Aria is a rogue.");
+    expect(result[0]!.contentSummary).toBe("Aria is a rogue.");
   });
 
   test("regenerates summary when contentSummaryGeneratedAt is older than updatedAt", async () => {
@@ -79,12 +80,12 @@ describe("ensureContentSummariesFresh", () => {
         updatedAt: NOW,
       },
     ]);
-    mockFetch.mockResolvedValue(makeSseResponse("Updated magic summary."));
+    mockFetch.mockResolvedValue(makeAiResponse("Updated magic summary."));
 
-    const result = await ensureContentSummariesFresh(["doc-2"], API_KEY);
+    const result = await ensureContentSummariesFresh(["doc-2"], provider);
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(result[0].contentSummary).toBe("Updated magic summary.");
+    expect(result[0]!.contentSummary).toBe("Updated magic summary.");
   });
 
   test("skips regeneration when summary is fresh", async () => {
@@ -100,14 +101,14 @@ describe("ensureContentSummariesFresh", () => {
       },
     ]);
 
-    const result = await ensureContentSummariesFresh(["doc-3"], API_KEY);
+    const result = await ensureContentSummariesFresh(["doc-3"], provider);
 
     expect(mockFetch).not.toHaveBeenCalled();
     expect(mockUpdate).not.toHaveBeenCalled();
-    expect(result[0].contentSummary).toBe("Existing summary.");
+    expect(result[0]!.contentSummary).toBe("Existing summary.");
   });
 
-  test("leaves summary unchanged when OpenRouter call fails", async () => {
+  test("leaves summary unchanged when AI call fails", async () => {
     mockFindMany.mockResolvedValue([
       {
         id: "doc-4",
@@ -121,9 +122,9 @@ describe("ensureContentSummariesFresh", () => {
     ]);
     mockFetch.mockResolvedValue({ ok: false } as Response);
 
-    const result = await ensureContentSummariesFresh(["doc-4"], API_KEY);
+    const result = await ensureContentSummariesFresh(["doc-4"], provider);
 
     expect(mockUpdate).not.toHaveBeenCalled();
-    expect(result[0].contentSummary).toBeNull();
+    expect(result[0]!.contentSummary).toBeNull();
   });
 });

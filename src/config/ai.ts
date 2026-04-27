@@ -54,8 +54,11 @@ export const AI_CONFIG = {
   // OpenRouter
   // ---------------------------------------------------------------------------
 
-  /** Default model used for all AI chat and summarisation calls. */
+  /** Default model used for all AI chat and summarisation calls via OpenRouter. */
   OPENROUTER_DEFAULT_MODEL: "openai/gpt-4o-mini",
+
+  /** Default Anthropic model used when the Anthropic provider is selected. */
+  ANTHROPIC_DEFAULT_MODEL: "claude-haiku-4-5-20251001",
 
   /** Number of loglines generated per brainstorm batch. */
   BRAINSTORM_LOGLINE_COUNT: 5,

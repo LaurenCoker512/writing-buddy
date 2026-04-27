@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { decryptApiKey } from "@/lib/encryption";
 import { tiptapToMarkdown } from "@/lib/tiptap-to-markdown";
 import { getSectionMarkdown } from "@/lib/section-utils";
 import type { TipTapNode } from "@/lib/tiptap-to-markdown";
 import type { TipTapDoc } from "@/lib/section-utils";
 import type { DiffProposal } from "@/types/diff";
-import { AI_CONFIG } from "@/config/ai";
+import { resolveAiProvider } from "@/lib/ai-provider";
 
 interface AiDiffItem {
   heading: unknown;
@@ -86,58 +85,33 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { openRouterKey: true },
+    select: { openRouterKey: true, anthropicKey: true, aiProvider: true },
   });
 
-  if (!user?.openRouterKey) {
+  const providerResult = resolveAiProvider(user ?? { openRouterKey: null, anthropicKey: null, aiProvider: null });
+  if (!providerResult.ok) {
     return NextResponse.json(
-      { error: "no_api_key", message: "Add your OpenRouter API key in Settings to use AI features." },
+      { error: providerResult.error, message: providerResult.message },
       { status: 402 },
     );
   }
 
-  let apiKey: string;
-  try {
-    apiKey = decryptApiKey(user.openRouterKey);
-  } catch {
-    return NextResponse.json({ error: "Failed to decrypt API key" }, { status: 500 });
-  }
+  const { provider } = providerResult;
 
   const tiptapDoc = document.tiptapJson as TipTapDoc;
   const documentMarkdown = tiptapToMarkdown(tiptapDoc as TipTapNode);
 
   const userMessage = `Document:\n${documentMarkdown || "(empty document)"}\n\nEdit instruction: ${body.instruction}`;
 
-  const openRouterResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://writing-buddy.app",
-      "X-Title": "Writing Buddy",
-    },
-    body: JSON.stringify({
-      model: AI_CONFIG.OPENROUTER_DEFAULT_MODEL,
-      stream: false,
-      messages: [
-        { role: "system", content: DIFF_SYSTEM_PROMPT },
-        { role: "user", content: userMessage },
-      ],
-    }),
-  });
-
-  if (!openRouterResponse.ok) {
-    const errorText = await openRouterResponse.text();
-    return NextResponse.json(
-      { error: "OpenRouter API error", details: errorText },
-      { status: 502 },
+  let rawContent: string;
+  try {
+    rawContent = await provider.completeChat(
+      [{ role: "user", content: userMessage }],
+      DIFF_SYSTEM_PROMPT,
     );
+  } catch {
+    return NextResponse.json({ error: "AI provider error" }, { status: 502 });
   }
-
-  const aiData = (await openRouterResponse.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const rawContent = aiData.choices?.[0]?.message?.content ?? "";
 
   let parsed: AiDiffResponse;
   try {

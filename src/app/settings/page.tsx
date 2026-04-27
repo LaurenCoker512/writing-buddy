@@ -13,21 +13,25 @@ export default async function SettingsPage() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user?.id },
-    select: { openRouterKey: true },
+    select: { openRouterKey: true, anthropicKey: true, aiProvider: true },
   });
 
-  const hasKey = user?.openRouterKey !== null && user?.openRouterKey !== undefined;
+  const hasOpenRouterKey = user?.openRouterKey !== null && user?.openRouterKey !== undefined;
+  const hasAnthropicKey = user?.anthropicKey !== null && user?.anthropicKey !== undefined;
+  const activeProvider = user?.aiProvider ?? "OPENROUTER";
 
   return (
     <main className="flex min-h-screen flex-col p-8">
       <header className="mb-12">
-        <h1 className="font-heading text-3xl font-bold text-text-primary">
-          Settings
-        </h1>
+        <h1 className="font-heading text-3xl font-bold text-text-primary">Settings</h1>
       </header>
 
       <div className="mx-auto w-full max-w-lg space-y-12">
-        <ApiKeyForm hasKey={hasKey} />
+        <ApiKeyForm
+          hasOpenRouterKey={hasOpenRouterKey}
+          hasAnthropicKey={hasAnthropicKey}
+          activeProvider={activeProvider}
+        />
         <hr className="border-border" />
         <DeleteAccountButton />
       </div>
