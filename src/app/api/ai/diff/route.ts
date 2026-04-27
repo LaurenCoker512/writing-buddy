@@ -6,7 +6,7 @@ import { getSectionMarkdown } from "@/lib/section-utils";
 import type { TipTapNode } from "@/lib/tiptap-to-markdown";
 import type { TipTapDoc } from "@/lib/section-utils";
 import type { DiffProposal } from "@/types/diff";
-import { resolveAiProvider } from "@/lib/ai-provider";
+import { resolveAiProvider, stripJsonFences } from "@/lib/ai-provider";
 
 interface AiDiffItem {
   heading: unknown;
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { openRouterKey: true, anthropicKey: true, aiProvider: true },
+    select: { openRouterKey: true, anthropicKey: true, aiProvider: true, anthropicModel: true },
   });
 
   const providerResult = resolveAiProvider(user ?? { openRouterKey: null, anthropicKey: null, aiProvider: null });
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
 
   let parsed: AiDiffResponse;
   try {
-    parsed = JSON.parse(rawContent) as AiDiffResponse;
+    parsed = JSON.parse(stripJsonFences(rawContent)) as AiDiffResponse;
   } catch {
     return NextResponse.json({ error: "Failed to parse AI response" }, { status: 502 });
   }

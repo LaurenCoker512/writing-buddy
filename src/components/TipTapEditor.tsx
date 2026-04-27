@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useEditor, EditorContent, type Editor } from "@tiptap/react";
+import { useEditor, useEditorState, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import { Table } from "@tiptap/extension-table";
@@ -68,6 +68,22 @@ function Toolbar({
   documentId: string;
   documentName: string;
 }) {
+  const state = useEditorState({
+    editor,
+    selector: ({ editor: ed }) => ({
+      isH1: ed.isActive("heading", { level: 1 }),
+      isH2: ed.isActive("heading", { level: 2 }),
+      isH3: ed.isActive("heading", { level: 3 }),
+      isBold: ed.isActive("bold"),
+      isItalic: ed.isActive("italic"),
+      isUnderline: ed.isActive("underline"),
+      isBulletList: ed.isActive("bulletList"),
+      isOrderedList: ed.isActive("orderedList"),
+      isTable: ed.isActive("table"),
+      canInsertTable: ed.can().insertTable({ rows: 3, cols: 3, withHeaderRow: true }),
+    }),
+  });
+
   const getMarkdown = () => tiptapToMarkdown(editor.getJSON() as TipTapNode);
 
   const handleDownloadMarkdown = () => {
@@ -87,21 +103,21 @@ function Toolbar({
     >
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-        active={editor.isActive("heading", { level: 1 })}
+        active={state.isH1}
         label="Heading 1"
       >
         H1
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-        active={editor.isActive("heading", { level: 2 })}
+        active={state.isH2}
         label="Heading 2"
       >
         H2
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-        active={editor.isActive("heading", { level: 3 })}
+        active={state.isH3}
         label="Heading 3"
       >
         H3
@@ -111,21 +127,21 @@ function Toolbar({
 
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBold().run()}
-        active={editor.isActive("bold")}
+        active={state.isBold}
         label="Bold"
       >
         <strong>B</strong>
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleItalic().run()}
-        active={editor.isActive("italic")}
+        active={state.isItalic}
         label="Italic"
       >
         <em>I</em>
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleUnderline().run()}
-        active={editor.isActive("underline")}
+        active={state.isUnderline}
         label="Underline"
       >
         <span className="underline">U</span>
@@ -135,14 +151,14 @@ function Toolbar({
 
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBulletList().run()}
-        active={editor.isActive("bulletList")}
+        active={state.isBulletList}
         label="Bulleted list"
       >
         ≡
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
-        active={editor.isActive("orderedList")}
+        active={state.isOrderedList}
         label="Numbered list"
       >
         1≡
@@ -158,8 +174,8 @@ function Toolbar({
             .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
             .run()
         }
-        active={editor.isActive("table")}
-        disabled={!editor.can().insertTable({ rows: 3, cols: 3, withHeaderRow: true })}
+        active={state.isTable}
+        disabled={!state.canInsertTable}
         label="Insert table"
       >
         ⊞
@@ -269,6 +285,7 @@ export default function TipTapEditor({
   const appliedNonceRef = useRef(0);
 
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
       Underline,

@@ -32,10 +32,6 @@ export default function SignInPage() {
     }
   }
 
-  async function handleGoogleSignIn() {
-    await signIn("google", { callbackUrl: "/dashboard" });
-  }
-
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8">
       <div className="w-full max-w-sm space-y-6">
@@ -94,22 +90,6 @@ export default function SignInPage() {
             {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>
-
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-border" />
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="bg-background px-2 text-text-muted">or</span>
-          </div>
-        </div>
-
-        <button
-          onClick={handleGoogleSignIn}
-          className="w-full rounded border border-border bg-surface px-4 py-2 font-medium text-text-primary transition-colors hover:bg-background"
-        >
-          Continue with Google
-        </button>
 
         <p className="text-center text-sm text-text-muted">
           Don&apos;t have an account?{" "}

@@ -3,22 +3,44 @@
 import { useState } from "react";
 
 type ProviderType = "OPENROUTER" | "ANTHROPIC";
+type AnthropicModelType = "HAIKU" | "SONNET" | "OPUS";
+
+const ANTHROPIC_MODELS: { value: AnthropicModelType; label: string; description: string }[] = [
+  { value: "HAIKU", label: "Haiku", description: "Fast & affordable" },
+  { value: "SONNET", label: "Sonnet", description: "Balanced performance" },
+  { value: "OPUS", label: "Opus", description: "Most capable" },
+];
 
 interface ApiKeyFormProps {
   hasOpenRouterKey: boolean;
   hasAnthropicKey: boolean;
   activeProvider: ProviderType;
+  activeAnthropicModel: AnthropicModelType;
 }
 
 export default function ApiKeyForm({
   hasOpenRouterKey,
   hasAnthropicKey,
   activeProvider,
+  activeAnthropicModel,
 }: ApiKeyFormProps) {
   const [selectedProvider, setSelectedProvider] = useState<ProviderType>(activeProvider);
+  const [selectedModel, setSelectedModel] = useState<AnthropicModelType>(activeAnthropicModel);
   const [apiKey, setApiKey] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [modelStatus, setModelStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  async function handleModelChange(model: AnthropicModelType) {
+    setSelectedModel(model);
+    setModelStatus("saving");
+    const response = await fetch("/api/settings/anthropic-model", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model }),
+    });
+    setModelStatus(response.ok ? "saved" : "error");
+  }
 
   const hasKeyForSelected =
     selectedProvider === "OPENROUTER" ? hasOpenRouterKey : hasAnthropicKey;
@@ -76,6 +98,39 @@ export default function ApiKeyForm({
           </label>
         ))}
       </div>
+
+      {selectedProvider === "ANTHROPIC" && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-text-primary">Model</p>
+          <div className="flex gap-3">
+            {ANTHROPIC_MODELS.map(({ value, label, description }) => (
+              <label
+                key={value}
+                className="flex cursor-pointer flex-col gap-0.5 rounded border border-border bg-surface px-4 py-2 text-sm transition-colors has-[:checked]:border-accent has-[:checked]:bg-accent/10"
+              >
+                <span className="flex items-center gap-2 font-medium text-text-primary">
+                  <input
+                    type="radio"
+                    name="anthropic-model"
+                    value={value}
+                    checked={selectedModel === value}
+                    onChange={() => void handleModelChange(value)}
+                    className="accent-accent"
+                  />
+                  {label}
+                </span>
+                <span className="pl-5 text-xs text-text-muted">{description}</span>
+              </label>
+            ))}
+          </div>
+          {modelStatus === "saved" && (
+            <p role="status" className="text-xs text-green-700">Model updated.</p>
+          )}
+          {modelStatus === "error" && (
+            <p role="alert" className="text-xs text-red-600">Failed to update model.</p>
+          )}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-3">
         <div className="space-y-1">

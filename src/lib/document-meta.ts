@@ -52,6 +52,7 @@ export const CHARACTER_ROLES = [
 export const RELATIONSHIP_TYPES = [
   "Family",
   "Romantic",
+  "Friend",
   "Rival",
   "Mentor",
   "Ally",

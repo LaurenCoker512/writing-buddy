@@ -80,9 +80,11 @@ export class OpenRouterProvider implements ProviderAdapter {
 
 export class AnthropicProvider implements ProviderAdapter {
   private readonly client: Anthropic;
+  private readonly modelId: string;
 
-  constructor(private readonly apiKey: string) {
+  constructor(apiKey: string, modelId: string = AI_CONFIG.ANTHROPIC_DEFAULT_MODEL) {
     this.client = new Anthropic({ apiKey });
+    this.modelId = modelId;
   }
 
   async streamChat(
@@ -90,7 +92,7 @@ export class AnthropicProvider implements ProviderAdapter {
     systemPrompt: string,
   ): Promise<ReadableStream<Uint8Array>> {
     const sdkStream = this.client.messages.stream({
-      model: AI_CONFIG.ANTHROPIC_DEFAULT_MODEL,
+      model: this.modelId,
       max_tokens: 4096,
       system: systemPrompt || undefined,
       messages,
@@ -118,7 +120,7 @@ export class AnthropicProvider implements ProviderAdapter {
 
   async completeChat(messages: AiMessage[], systemPrompt: string): Promise<string> {
     const msg = await this.client.messages.create({
-      model: AI_CONFIG.ANTHROPIC_DEFAULT_MODEL,
+      model: this.modelId,
       max_tokens: 4096,
       system: systemPrompt || undefined,
       messages,
@@ -129,10 +131,16 @@ export class AnthropicProvider implements ProviderAdapter {
   }
 }
 
+/** Strips markdown code fences (```json ... ``` or ``` ... ```) from AI responses before JSON.parse. */
+export function stripJsonFences(raw: string): string {
+  return raw.replace(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i, "$1").trim();
+}
+
 export function resolveAiProvider(user: {
   aiProvider?: "OPENROUTER" | "ANTHROPIC" | null;
   openRouterKey?: string | null;
   anthropicKey?: string | null;
+  anthropicModel?: "HAIKU" | "SONNET" | "OPUS" | null;
 }): AiProviderResolution {
   const providerType = user.aiProvider ?? "OPENROUTER";
 
@@ -146,7 +154,8 @@ export function resolveAiProvider(user: {
     }
     try {
       const apiKey = decryptApiKey(user.anthropicKey);
-      return { ok: true, provider: new AnthropicProvider(apiKey) };
+      const modelId = AI_CONFIG.ANTHROPIC_MODEL_IDS[user.anthropicModel ?? "HAIKU"] ?? AI_CONFIG.ANTHROPIC_DEFAULT_MODEL;
+      return { ok: true, provider: new AnthropicProvider(apiKey, modelId) };
     } catch {
       return {
         ok: false,

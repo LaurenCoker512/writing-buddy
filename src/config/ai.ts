@@ -60,6 +60,13 @@ export const AI_CONFIG = {
   /** Default Anthropic model used when the Anthropic provider is selected. */
   ANTHROPIC_DEFAULT_MODEL: "claude-haiku-4-5-20251001",
 
+  /** Maps AnthropicModel enum values to their API model IDs. */
+  ANTHROPIC_MODEL_IDS: {
+    HAIKU: "claude-haiku-4-5-20251001",
+    SONNET: "claude-sonnet-4-6",
+    OPUS: "claude-opus-4-7",
+  } as Record<string, string>,
+
   /** Number of loglines generated per brainstorm batch. */
   BRAINSTORM_LOGLINE_COUNT: 5,
 

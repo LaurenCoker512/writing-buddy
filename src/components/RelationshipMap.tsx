@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import ReactFlow, {
   Background,
   Controls,
+  Handle,
+  Position,
   type NodeTypes,
   type Node,
   type Edge,
@@ -27,12 +29,14 @@ function CharacterNode({ data }: { data: { name: string; role: string | null } }
   const colorClass = data.role ? (ROLE_COLORS[data.role] ?? ROLE_COLORS.Other) : ROLE_COLORS.Other;
   return (
     <div className="rounded-lg border border-border bg-surface px-4 py-2 shadow-sm min-w-[140px] text-center cursor-pointer hover:border-accent transition-colors">
+      <Handle type="target" position={Position.Top} className="!bg-border" />
       <div className="text-sm font-medium text-text-primary truncate">{data.name}</div>
       {data.role && (
         <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${colorClass}`}>
           {data.role}
         </span>
       )}
+      <Handle type="source" position={Position.Bottom} className="!bg-border" />
     </div>
   );
 }
@@ -112,7 +116,7 @@ export default function RelationshipMap({
 }: RelationshipMapProps) {
   const router = useRouter();
   const [scope, setScope] = useState<"story" | "universe">(
-    universeId ? "story" : "story",
+    storyId !== null ? "story" : "universe",
   );
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -182,7 +186,7 @@ export default function RelationshipMap({
             {scope === "universe" && universeName ? universeName : storyName}
           </p>
         </div>
-        {universeId && (
+        {storyId !== null && universeId !== null && (
           <div
             className="flex rounded-lg border border-border text-sm overflow-hidden"
             role="group"

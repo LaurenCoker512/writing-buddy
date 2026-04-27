@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { nanoid } from "nanoid";
 import { AI_CONFIG } from "@/config/ai";
 
@@ -15,17 +15,38 @@ interface BrainstormResponse {
   message?: string;
 }
 
+interface Universe {
+  id: string;
+  name: string;
+  mode: string;
+  sourceTitle: string | null;
+}
+
+interface UniverseDocument {
+  id: string;
+  name: string;
+  type: string;
+}
+
 type Mode = "ORIGINAL" | "FANFIC";
 
 async function fetchLoglines(
   mode: Mode,
   sourceTitle: string,
   seed: string,
+  universeId?: string,
+  documentIds?: string[],
 ): Promise<string[]> {
   const res = await fetch("/api/brainstorm", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode, sourceTitle: sourceTitle || undefined, seed: seed || undefined }),
+    body: JSON.stringify({
+      mode,
+      sourceTitle: sourceTitle || undefined,
+      seed: seed || undefined,
+      universeId: universeId || undefined,
+      documentIds: documentIds && documentIds.length > 0 ? documentIds : undefined,
+    }),
   });
 
   const data = (await res.json()) as BrainstormResponse;
@@ -96,11 +117,67 @@ export default function BrainstormPage() {
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [savingId, setSavingId] = useState<string | null>(null);
 
+  const [universes, setUniverses] = useState<Universe[]>([]);
+  const [selectedUniverseId, setSelectedUniverseId] = useState<string>("");
+  const [universeDocs, setUniverseDocs] = useState<UniverseDocument[]>([]);
+  const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
+  const [loadingDocs, setLoadingDocs] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/universes")
+      .then((res) => (res.ok ? (res.json() as Promise<Universe[]>) : Promise.resolve([])))
+      .then(setUniverses)
+      .catch(() => setUniverses([]));
+  }, []);
+
+  useEffect(() => {
+    if (!selectedUniverseId) {
+      setUniverseDocs([]);
+      setSelectedDocIds(new Set());
+      return;
+    }
+    setLoadingDocs(true);
+    fetch(`/api/universes/${selectedUniverseId}/documents`)
+      .then((res) =>
+        res.ok ? (res.json() as Promise<UniverseDocument[]>) : Promise.resolve([]),
+      )
+      .then((docs) => {
+        setUniverseDocs(docs);
+        setSelectedDocIds(new Set(docs.map((d) => d.id)));
+      })
+      .catch(() => setUniverseDocs([]))
+      .finally(() => setLoadingDocs(false));
+  }, [selectedUniverseId]);
+
+  function toggleDoc(docId: string) {
+    setSelectedDocIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(docId)) {
+        next.delete(docId);
+      } else {
+        next.add(docId);
+      }
+      return next;
+    });
+  }
+
+  function toggleAllDocs(checked: boolean) {
+    setSelectedDocIds(checked ? new Set(universeDocs.map((d) => d.id)) : new Set());
+  }
+
+  const activeDocIds = Array.from(selectedDocIds);
+
   async function generate() {
     setLoading(true);
     setError(null);
     try {
-      const loglines = await fetchLoglines(mode, sourceTitle, seed);
+      const loglines = await fetchLoglines(
+        mode,
+        sourceTitle,
+        seed,
+        selectedUniverseId || undefined,
+        activeDocIds,
+      );
       setCards(loglines.map((text) => ({ id: nanoid(), text })));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -113,7 +190,13 @@ export default function BrainstormPage() {
     setRegeneratingId(cardId);
     setError(null);
     try {
-      const loglines = await fetchLoglines(mode, sourceTitle, seed);
+      const loglines = await fetchLoglines(
+        mode,
+        sourceTitle,
+        seed,
+        selectedUniverseId || undefined,
+        activeDocIds,
+      );
       if (loglines.length > 0) {
         setCards((prev) =>
           prev.map((card) =>
@@ -226,6 +309,80 @@ export default function BrainstormPage() {
             className="w-full resize-none rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent"
           />
         </div>
+
+        {/* Universe context */}
+        {universes.length > 0 && (
+          <div className="space-y-2">
+            <label
+              htmlFor="universe-select"
+              className="mb-1 block text-sm font-medium text-text-primary"
+            >
+              Universe context <span className="text-text-muted">(optional)</span>
+            </label>
+            <select
+              id="universe-select"
+              value={selectedUniverseId}
+              onChange={(e) => setSelectedUniverseId(e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent"
+            >
+              <option value="">None</option>
+              {universes.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                  {u.sourceTitle !== null ? ` (${u.sourceTitle})` : ""}
+                </option>
+              ))}
+            </select>
+
+            {selectedUniverseId !== "" && (
+              <div className="rounded-lg border border-border bg-surface p-3">
+                {loadingDocs ? (
+                  <p className="text-xs text-text-muted">Loading documents…</p>
+                ) : universeDocs.length === 0 ? (
+                  <p className="text-xs text-text-muted">No documents in this universe.</p>
+                ) : (
+                  <>
+                    <div className="mb-2 flex items-center gap-2">
+                      <input
+                        id="select-all-docs"
+                        type="checkbox"
+                        checked={selectedDocIds.size === universeDocs.length}
+                        onChange={(e) => toggleAllDocs(e.target.checked)}
+                        className="accent-accent"
+                      />
+                      <label
+                        htmlFor="select-all-docs"
+                        className="text-xs font-medium text-text-muted"
+                      >
+                        Select all ({universeDocs.length})
+                      </label>
+                    </div>
+                    <ul className="space-y-1.5">
+                      {universeDocs.map((doc) => (
+                        <li key={doc.id} className="flex items-center gap-2">
+                          <input
+                            id={`doc-${doc.id}`}
+                            type="checkbox"
+                            checked={selectedDocIds.has(doc.id)}
+                            onChange={() => toggleDoc(doc.id)}
+                            className="accent-accent"
+                          />
+                          <label
+                            htmlFor={`doc-${doc.id}`}
+                            className="text-xs text-text-primary"
+                          >
+                            {doc.name}
+                            <span className="ml-1 text-text-muted">({doc.type.toLowerCase()})</span>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex items-center gap-3">
           <button

@@ -8,6 +8,7 @@ import SplitView from "@/components/SplitView";
 import ChatPanel from "@/components/ChatPanel";
 import VersionHistoryPanel from "@/components/VersionHistoryPanel";
 import DocumentMetaBar from "@/components/DocumentMetaBar";
+import DocumentLinksBar from "@/components/DocumentLinksBar";
 import ContradictionCheckerModal from "@/components/ContradictionCheckerModal";
 import { replaceSectionInTipTap, appendSectionToTipTap } from "@/lib/section-utils";
 import type { TipTapDoc } from "@/lib/section-utils";
@@ -32,6 +33,8 @@ interface DocumentWorkspaceProps {
   initialJson: object;
   initialMeta: Record<string, unknown> | null;
   storyId: string | null;
+  seriesId: string | null;
+  universeId: string | null;
   parentDocumentId: string | null;
   parentDocumentName: string | null;
   parentCandidates: { id: string; name: string }[];
@@ -44,6 +47,8 @@ export default function DocumentWorkspace({
   initialJson,
   initialMeta,
   storyId,
+  seriesId,
+  universeId,
   parentDocumentId: initialParentDocumentId,
   parentDocumentName: initialParentDocumentName,
   parentCandidates,
@@ -139,7 +144,7 @@ export default function DocumentWorkspace({
               className="rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-700"
               aria-label="Canon document"
             >
-              [C]
+              C
             </span>
           )}
           <div className="ml-auto flex items-center gap-1">
@@ -239,6 +244,17 @@ export default function DocumentWorkspace({
         documentId={documentId}
         documentType={documentType as DocumentTypeValue}
         initialMeta={initialMeta}
+        storyId={storyId}
+        seriesId={seriesId}
+        universeId={universeId}
+      />
+      <DocumentLinksBar
+        documentId={documentId}
+        documentType={documentType}
+        meta={initialMeta}
+        storyId={storyId}
+        seriesId={seriesId}
+        universeId={universeId}
       />
       <div className="flex-1 overflow-auto">
         <TipTapEditor

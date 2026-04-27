@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { DocumentTypeValue } from "@/lib/documents";
 import {
   CHARACTER_ROLES,
@@ -11,10 +11,18 @@ import {
   type WorldbuildingMeta,
 } from "@/lib/document-meta";
 
+interface CharacterOption {
+  id: string;
+  name: string;
+}
+
 interface DocumentMetaBarProps {
   documentId: string;
   documentType: DocumentTypeValue;
   initialMeta: Record<string, unknown> | null;
+  storyId?: string | null;
+  seriesId?: string | null;
+  universeId?: string | null;
 }
 
 const selectClass =
@@ -25,12 +33,33 @@ export default function DocumentMetaBar({
   documentId,
   documentType,
   initialMeta,
+  storyId,
+  seriesId,
+  universeId,
 }: DocumentMetaBarProps) {
   const [meta, setMeta] = useState<Record<string, unknown>>(initialMeta ?? {});
+  const [characterOptions, setCharacterOptions] = useState<CharacterOption[]>([]);
+  const [characterError, setCharacterError] = useState<string | null>(null);
 
-  async function saveMeta(updated: Record<string, unknown>) {
+  useEffect(() => {
+    if (documentType !== "RELATIONSHIP") return;
+    const scopeParam = storyId
+      ? `storyId=${storyId}`
+      : seriesId
+        ? `seriesId=${seriesId}`
+        : universeId
+          ? `universeId=${universeId}`
+          : null;
+    if (scopeParam === null) return;
+    fetch(`/api/documents?${scopeParam}&types=CHARACTER`)
+      .then((res) => (res.ok ? (res.json() as Promise<CharacterOption[]>) : Promise.resolve([])))
+      .then(setCharacterOptions)
+      .catch(() => setCharacterOptions([]));
+  }, [documentType, storyId, seriesId, universeId]);
+
+  async function saveMeta(updated: Record<string, unknown>): Promise<Response> {
     setMeta(updated);
-    await fetch(`/api/documents/${documentId}`, {
+    return fetch(`/api/documents/${documentId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ meta: updated }),
@@ -67,10 +96,24 @@ export default function DocumentMetaBar({
 
   if (documentType === "RELATIONSHIP") {
     const relMeta = meta as RelationshipMeta;
+    const [charAId, charBId] = relMeta.characterIds ?? ["", ""];
+
+    const saveCharacters = async (aId: string, bId: string) => {
+      setCharacterError(null);
+      const characterIds = [aId, bId].filter((id) => id !== "");
+      const updated = { ...meta, characterIds: characterIds.length === 2 ? characterIds : characterIds.length === 0 ? undefined : characterIds };
+      const res = await saveMeta(updated);
+      if (res.status === 409) {
+        const body = (await res.json()) as { error?: string };
+        setCharacterError(body.error ?? "A relationship between these two characters already exists.");
+        setMeta(meta);
+      }
+    };
+
     return (
-      <div className="flex shrink-0 items-center gap-4 border-b border-border bg-surface px-6 py-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-4 border-b border-border bg-surface px-6 py-2">
         <label className={labelClass} htmlFor="relationship-type">
-          Relationship Type
+          Type
           <select
             id="relationship-type"
             data-testid="meta-relationship-type-select"
@@ -89,6 +132,50 @@ export default function DocumentMetaBar({
             ))}
           </select>
         </label>
+
+        {characterOptions.length > 0 && (
+          <>
+            <label className={labelClass} htmlFor="relationship-char-a">
+              Character A
+              <select
+                id="relationship-char-a"
+                data-testid="meta-char-a-select"
+                className={selectClass}
+                value={charAId ?? ""}
+                onChange={(e) => { void saveCharacters(e.target.value, charBId ?? ""); }}
+              >
+                <option value="">— Select —</option>
+                {characterOptions.map((c) => (
+                  <option key={c.id} value={c.id} disabled={c.id === charBId}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className={labelClass} htmlFor="relationship-char-b">
+              Character B
+              <select
+                id="relationship-char-b"
+                data-testid="meta-char-b-select"
+                className={selectClass}
+                value={charBId ?? ""}
+                onChange={(e) => { void saveCharacters(charAId ?? "", e.target.value); }}
+              >
+                <option value="">— Select —</option>
+                {characterOptions.map((c) => (
+                  <option key={c.id} value={c.id} disabled={c.id === charAId}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {characterError !== null && (
+              <p className="w-full text-xs text-red-600">{characterError}</p>
+            )}
+          </>
+        )}
       </div>
     );
   }

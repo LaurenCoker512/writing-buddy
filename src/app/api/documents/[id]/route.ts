@@ -74,6 +74,51 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
   }
 
+  if (
+    existing.type === "RELATIONSHIP" &&
+    typeof body.meta === "object" &&
+    body.meta !== null &&
+    !Array.isArray(body.meta)
+  ) {
+    const incomingMeta = body.meta as Record<string, unknown>;
+    if (
+      Array.isArray(incomingMeta.characterIds) &&
+      incomingMeta.characterIds.length === 2 &&
+      incomingMeta.characterIds.every((id) => typeof id === "string")
+    ) {
+      const [idA, idB] = incomingMeta.characterIds as [string, string];
+      const scopeWhere = existing.storyId
+        ? { storyId: existing.storyId }
+        : existing.seriesId
+          ? { seriesId: existing.seriesId }
+          : existing.universeId
+            ? { universeId: existing.universeId }
+            : null;
+
+      if (scopeWhere !== null) {
+        const siblings = await prisma.document.findMany({
+          where: { ...scopeWhere, type: "RELATIONSHIP", id: { not: existing.id } },
+          select: { meta: true },
+        });
+
+        const conflict = siblings.some((sib) => {
+          if (typeof sib.meta !== "object" || sib.meta === null || Array.isArray(sib.meta)) return false;
+          const sibIds = (sib.meta as Record<string, unknown>).characterIds;
+          if (!Array.isArray(sibIds) || sibIds.length !== 2) return false;
+          const [sA, sB] = sibIds as [string, string];
+          return (sA === idA && sB === idB) || (sA === idB && sB === idA);
+        });
+
+        if (conflict) {
+          return NextResponse.json(
+            { error: "A relationship between these two characters already exists." },
+            { status: 409 },
+          );
+        }
+      }
+    }
+  }
+
   const updated = await prisma.document.update({
     where: { id: params.id },
     data,

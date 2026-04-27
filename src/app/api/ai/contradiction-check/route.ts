@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { tiptapToMarkdown } from "@/lib/tiptap-to-markdown";
 import type { TipTapNode } from "@/lib/tiptap-to-markdown";
 import { estimateContradictionTokens } from "@/lib/contradiction";
-import { resolveAiProvider } from "@/lib/ai-provider";
+import { resolveAiProvider, stripJsonFences } from "@/lib/ai-provider";
 
 interface AiIssueRaw {
   description: unknown;
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { openRouterKey: true, anthropicKey: true, aiProvider: true },
+    select: { openRouterKey: true, anthropicKey: true, aiProvider: true, anthropicModel: true },
   });
 
   const providerResult = resolveAiProvider(user ?? { openRouterKey: null, anthropicKey: null, aiProvider: null });
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
 
   let parsed: AiContradictionResponse;
   try {
-    parsed = JSON.parse(rawContent) as AiContradictionResponse;
+    parsed = JSON.parse(stripJsonFences(rawContent)) as AiContradictionResponse;
   } catch {
     return NextResponse.json({ error: "Failed to parse AI response" }, { status: 502 });
   }

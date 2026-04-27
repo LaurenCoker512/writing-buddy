@@ -294,8 +294,9 @@ interface CanonIngestionState {
 }
 
 interface NewDocumentState {
-  storyId: string;
-  storyName: string;
+  parentId: string;
+  parentName: string;
+  parentType: "story" | "universe";
   storyMode?: string;
 }
 
@@ -840,19 +841,22 @@ function NewProjectModal({
 
 // ── New Document Modal ────────────────────────────────────────────────────────
 
+const UNIVERSE_DOCUMENT_TYPES = DOCUMENT_TYPE_ORDER.filter((t) => t !== "SCENE");
+
 function NewDocumentModal({
-  storyId,
-  storyName,
+  parentName,
+  parentType,
   storyMode,
   onConfirm,
   onClose,
 }: {
-  storyId: string;
-  storyName: string;
+  parentName: string;
+  parentType: "story" | "universe";
   storyMode?: string;
   onConfirm: (type: DocumentTypeValue, name: string, sourceText?: string) => void;
   onClose: () => void;
 }) {
+  const allowedTypes = parentType === "universe" ? UNIVERSE_DOCUMENT_TYPES : DOCUMENT_TYPE_ORDER;
   const [docType, setDocType] = useState<DocumentTypeValue>("CHARACTER");
   const [name, setName] = useState("");
   const [sourceText, setSourceText] = useState("");
@@ -880,14 +884,14 @@ function NewDocumentModal({
         <h2 className="mb-1 font-heading text-lg font-semibold text-text-primary">
           New Document
         </h2>
-        <p className="mb-4 text-xs text-text-muted">In: {storyName}</p>
+        <p className="mb-4 text-xs text-text-muted">In: {parentName}</p>
 
         <fieldset className="mb-4">
           <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-text-muted">
             Type
           </legend>
           <div className="grid grid-cols-3 gap-1.5">
-            {DOCUMENT_TYPE_ORDER.map((type) => (
+            {allowedTypes.map((type) => (
               <button
                 key={type}
                 onClick={() => setDocType(type)}
@@ -1121,6 +1125,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const [newDocumentModal, setNewDocumentModal] = useState<NewDocumentState | null>(null);
   const [canonIngestionModal, setCanonIngestionModal] = useState<CanonIngestionState | null>(null);
   const [contradictionModal, setContradictionModal] = useState<{ storyId: string; storyName: string } | null>(null);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const stored = localStorage.getItem("sidebar-collapsed");
@@ -1152,6 +1157,15 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     setCollapsed((prev) => {
       const next = !prev;
       localStorage.setItem("sidebar-collapsed", String(next));
+      return next;
+    });
+  };
+
+  const toggleSection = (key: string) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
@@ -1199,15 +1213,19 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   };
 
   const handleDocumentCreate = async (
-    storyId: string,
+    parent: NewDocumentState,
     type: DocumentTypeValue,
     name: string,
     sourceText?: string,
   ) => {
+    const scopeBody =
+      parent.parentType === "universe"
+        ? { universeId: parent.parentId }
+        : { storyId: parent.parentId };
     const res = await fetch("/api/documents", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type, name, storyId }),
+      body: JSON.stringify({ type, name, ...scopeBody }),
     });
     setNewDocumentModal(null);
     fetchTree();
@@ -1239,7 +1257,13 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   };
 
   const handleCreate = async (data: CreateData) => {
-    const endpoint = `/api/${data.itemType}s`;
+    const endpointMap: Record<NodeType, string> = {
+      universe: "/api/universes",
+      series: "/api/series",
+      story: "/api/stories",
+      document: "/api/documents",
+    };
+    const endpoint = endpointMap[data.itemType];
     const body: Record<string, unknown> = {
       name: data.name,
       mode: data.mode,
@@ -1260,9 +1284,13 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     });
     setNewProjectModal(false);
     fetchTree();
-    if (data.itemType === "universe" && data.mode === "FANFIC" && res.ok) {
-      const created = (await res.json()) as { id: string };
+    if (!res.ok) return;
+    const created = (await res.json()) as { id: string };
+    if (data.itemType === "universe" && data.mode === "FANFIC") {
       setCanonIngestionModal({ universeId: created.id, universeName: data.name });
+    } else if (data.itemType === "story") {
+      setExpanded((prev) => new Set([...prev, created.id]));
+      router.push(`/dashboard/stories/${created.id}/map`);
     }
   };
 
@@ -1321,7 +1349,13 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   );
   };
 
-  const renderDocumentSections = (documents: DocumentItem[], depth: number) =>
+  const renderDocumentSections = (
+    documents: DocumentItem[],
+    depth: number,
+    parentId: string,
+    mapHref?: string,
+    mapAriaLabel?: string,
+  ) =>
     DOCUMENT_TYPE_ORDER.flatMap((type) => {
       const docs = documents
         .filter((d) => d.type === type)
@@ -1331,18 +1365,29 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           if (b.order !== null) return 1;
           return 0;
         });
-      if (docs.length === 0) return [];
+
+      const isRelationship = type === "RELATIONSHIP";
+      const hasMap = isRelationship && mapHref !== undefined;
+      if (docs.length === 0 && !hasMap) return [];
+
+      const sectionKey = `${parentId}-${type}`;
+      const isSectionCollapsed = collapsedSections.has(sectionKey);
 
       const sectionLabel = (
         <li key={`section-${type}`}>
-          <div
-            className="px-2 pb-0.5 pt-2 text-xs font-medium uppercase tracking-wide text-text-muted"
+          <button
+            onClick={() => toggleSection(sectionKey)}
+            className="flex w-full items-center gap-1 pb-0.5 pt-2 text-xs font-medium uppercase tracking-wide text-text-muted hover:text-text-primary"
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
+            aria-expanded={!isSectionCollapsed}
           >
+            {!collapsed && <ChevronIcon expanded={!isSectionCollapsed} className="h-2.5 w-2.5 shrink-0" />}
             {DOCUMENT_SECTION_LABELS[type]}
-          </div>
+          </button>
         </li>
       );
+
+      if (isSectionCollapsed) return [sectionLabel];
 
       if (type === "SCENE") {
         return [
@@ -1363,12 +1408,36 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         ];
       }
 
-      return [sectionLabel, ...docs.map((doc) => renderDocumentNode(doc, depth))];
+      const docNodes = docs.map((doc) => renderDocumentNode(doc, depth));
+
+      if (hasMap) {
+        const mapNode = (
+          <li key={`map-${mapHref}`}>
+            <div style={{ paddingLeft: `${depth * 12 + 8}px` }}>
+              <Link
+                href={mapHref}
+                className={`flex items-center gap-1.5 rounded px-2 py-1.5 text-sm transition-colors ${
+                  pathname === mapHref
+                    ? "bg-accent/10 text-accent"
+                    : "text-text-muted hover:bg-background hover:text-text-primary"
+                }`}
+                aria-label={mapAriaLabel}
+                aria-current={pathname === mapHref ? "page" : undefined}
+              >
+                <GraphIcon className="h-3.5 w-3.5 shrink-0" />
+                {!collapsed && <span className="truncate">Relationship Map</span>}
+              </Link>
+            </div>
+          </li>
+        );
+        return [sectionLabel, ...docNodes, mapNode];
+      }
+
+      return [sectionLabel, ...docNodes];
     });
 
   const renderStoryNode = (story: StoryItem, depth: number) => {
     const isExpanded = expanded.has(story.id);
-    const hasDocuments = story.documents.length > 0;
 
     return (
       <li key={story.id}>
@@ -1401,7 +1470,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setNewDocumentModal({ storyId: story.id, storyName: story.name, storyMode: story.mode });
+                  setNewDocumentModal({ parentId: story.id, parentName: story.name, parentType: "story", storyMode: story.mode });
                 }}
                 className="invisible shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:visible"
                 aria-label={`Add document to ${story.name}`}
@@ -1422,24 +1491,13 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         </div>
         {isExpanded && (
           <ul>
-            {hasDocuments && renderDocumentSections(story.documents, depth + 1)}
-            <li key={`map-${story.id}`}>
-              <div style={{ paddingLeft: `${(depth + 1) * 12 + 8}px` }}>
-                <Link
-                  href={`/dashboard/stories/${story.id}/map`}
-                  className={`flex items-center gap-1.5 rounded px-2 py-1.5 text-sm transition-colors ${
-                    pathname === `/dashboard/stories/${story.id}/map`
-                      ? "bg-accent/10 text-accent"
-                      : "text-text-muted hover:bg-background hover:text-text-primary"
-                  }`}
-                  data-testid={`story-map-${story.id}`}
-                  aria-label={`Relationship Map for ${story.name}`}
-                >
-                  <GraphIcon className="h-3.5 w-3.5 shrink-0" />
-                  {!collapsed && <span className="truncate">Relationship Map</span>}
-                </Link>
-              </div>
-            </li>
+            {renderDocumentSections(
+              story.documents,
+              depth + 1,
+              story.id,
+              `/dashboard/stories/${story.id}/map`,
+              `Relationship Map for ${story.name}`,
+            )}
           </ul>
         )}
       </li>
@@ -1541,40 +1599,55 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             )}
           </button>
           {!collapsed && (
-            <button
-              onClick={(e) =>
-                openContextMenu(e, universe.id, "universe", universe.name)
-              }
-              className="invisible shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:visible"
-              aria-label={`Options for ${universe.name}`}
-              data-testid={`universe-menu-${universe.id}`}
-            >
-              <DotsIcon className="h-3.5 w-3.5" />
-            </button>
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setNewDocumentModal({ parentId: universe.id, parentName: universe.name, parentType: "universe" });
+                }}
+                className="invisible shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:visible"
+                aria-label={`Add document to ${universe.name}`}
+                data-testid={`universe-add-doc-${universe.id}`}
+              >
+                <PlusIcon className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={(e) =>
+                  openContextMenu(e, universe.id, "universe", universe.name)
+                }
+                className="invisible shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:visible"
+                aria-label={`Options for ${universe.name}`}
+                data-testid={`universe-menu-${universe.id}`}
+              >
+                <DotsIcon className="h-3.5 w-3.5" />
+              </button>
+            </>
           )}
         </div>
         {isExpanded && (
           <ul>
-            {universe.documents.length > 0 && renderDocumentSections(universe.documents, 1)}
+            {renderDocumentSections(
+              universe.documents,
+              1,
+              universe.id,
+              `/dashboard/universes/${universe.id}/map`,
+              `Relationship Map for ${universe.name}`,
+            )}
             {universe.series.map((s) => renderSeriesNode(s, 1))}
-            {universe.stories.map((s) => renderStoryNode(s, 1))}
-            <li key={`map-${universe.id}`}>
-              <div style={{ paddingLeft: "20px" }}>
-                <Link
-                  href={`/dashboard/universes/${universe.id}/map`}
-                  className={`flex items-center gap-1.5 rounded px-2 py-1.5 text-sm transition-colors ${
-                    pathname === `/dashboard/universes/${universe.id}/map`
-                      ? "bg-accent/10 text-accent"
-                      : "text-text-muted hover:bg-background hover:text-text-primary"
-                  }`}
-                  data-testid={`universe-map-${universe.id}`}
-                  aria-label={`Relationship Map for ${universe.name}`}
+            {universe.stories.length > 0 && (
+              <li key={`section-stories-${universe.id}`}>
+                <button
+                  onClick={() => toggleSection(`${universe.id}-stories`)}
+                  className="flex w-full items-center gap-1 pb-0.5 pt-2 text-xs font-medium uppercase tracking-wide text-text-muted hover:text-text-primary"
+                  style={{ paddingLeft: "20px" }}
+                  aria-expanded={!collapsedSections.has(`${universe.id}-stories`)}
                 >
-                  <GraphIcon className="h-3.5 w-3.5 shrink-0" />
-                  {!collapsed && <span className="truncate">Relationship Map</span>}
-                </Link>
-              </div>
-            </li>
+                  {!collapsed && <ChevronIcon expanded={!collapsedSections.has(`${universe.id}-stories`)} className="h-2.5 w-2.5 shrink-0" />}
+                  Stories
+                </button>
+              </li>
+            )}
+            {universe.stories.length > 0 && !collapsedSections.has(`${universe.id}-stories`) && universe.stories.map((s) => renderStoryNode(s, 1))}
           </ul>
         )}
       </li>
@@ -1789,11 +1862,11 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       {/* New document modal */}
       {newDocumentModal !== null && (
         <NewDocumentModal
-          storyId={newDocumentModal.storyId}
-          storyName={newDocumentModal.storyName}
+          parentName={newDocumentModal.parentName}
+          parentType={newDocumentModal.parentType}
           storyMode={newDocumentModal.storyMode}
           onConfirm={(type, name, sourceText) =>
-            void handleDocumentCreate(newDocumentModal.storyId, type, name, sourceText)
+            void handleDocumentCreate(newDocumentModal, type, name, sourceText)
           }
           onClose={() => setNewDocumentModal(null)}
         />

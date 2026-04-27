@@ -1,10 +1,23 @@
 import { AI_CONFIG } from "@/config/ai";
 import type { ProviderAdapter } from "@/lib/ai-provider";
 
+export interface UniverseDoc {
+  name: string;
+  type: string;
+  summary: string;
+}
+
+export interface UniverseContext {
+  universeName: string;
+  sourceTitle?: string;
+  docs: UniverseDoc[];
+}
+
 export interface BrainstormRequest {
   mode: "ORIGINAL" | "FANFIC";
   sourceTitle?: string;
   seed?: string;
+  universeContext?: UniverseContext;
 }
 
 export interface LoglineCard {
@@ -38,7 +51,17 @@ function buildBrainstormPrompt(req: BrainstormRequest): string {
     ? `\n\nUse this seed idea as inspiration: ${req.seed.trim()}`
     : "";
 
-  return `Generate exactly ${count} distinct, compelling story loglines for ${modeText}. Each logline should be 1-2 sentences that capture the central conflict and stakes.${seedText}
+  let universeText = "";
+  if (req.universeContext && req.universeContext.docs.length > 0) {
+    const { universeName, sourceTitle, docs } = req.universeContext;
+    const universeLabel = sourceTitle
+      ? `"${universeName}" (fanfic universe based on "${sourceTitle}")`
+      : `"${universeName}"`;
+    const docEntries = docs.map((d) => `### ${d.name} (${d.type})\n${d.summary}`).join("\n\n");
+    universeText = `\n\nUse the following universe context as reference for tone, characters, worldbuilding, and existing story elements when generating loglines:\n\nUniverse: ${universeLabel}\n\n${docEntries}`;
+  }
+
+  return `Generate exactly ${count} distinct, compelling story loglines for ${modeText}. Each logline should be 1-2 sentences that capture the central conflict and stakes.${seedText}${universeText}
 
 Format your response as a numbered list with exactly ${count} items. Each item on its own line. No introductory text, no explanations, just the numbered loglines.`;
 }

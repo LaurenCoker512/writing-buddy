@@ -63,6 +63,8 @@ export default async function DocumentPage({ params }: Props) {
       initialJson={tiptapJson}
       initialMeta={initialMeta}
       storyId={document.storyId}
+      seriesId={document.seriesId}
+      universeId={universeId}
       parentDocumentId={document.parentDocumentId}
       parentDocumentName={document.parent?.name ?? null}
       parentCandidates={parentCandidates}

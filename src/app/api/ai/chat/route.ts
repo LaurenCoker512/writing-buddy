@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { openRouterKey: true, anthropicKey: true, aiProvider: true, explicitEnabled: true },
+    select: { openRouterKey: true, anthropicKey: true, aiProvider: true, anthropicModel: true, explicitEnabled: true },
   });
 
   const providerResult = resolveAiProvider(user ?? { openRouterKey: null, anthropicKey: null, aiProvider: null });

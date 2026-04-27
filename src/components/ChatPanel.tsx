@@ -6,7 +6,7 @@ import DiffCard from "@/components/DiffCard";
 import type { DiffProposal } from "@/types/diff";
 import { parseInlineBadges } from "@/lib/canon-badge";
 
-type ChatMessage = { kind: "message"; key: string; role: "user" | "assistant"; content: string };
+type ChatMessage = { kind: "message"; key: string; id?: string; role: "user" | "assistant"; content: string };
 type DiffItem = { kind: "diff"; key: string; proposal: DiffProposal };
 type ChatItem = ChatMessage | DiffItem;
 
@@ -14,6 +14,21 @@ interface ChatPanelProps {
   documentId: string;
   onAcceptDiff: (proposal: DiffProposal) => Promise<void>;
   initialDiffProposals?: DiffProposal[];
+}
+
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M2.5 4h11M5.5 4V2.5h5V4M6.5 7v5M9.5 7v5M3.5 4l.8 9.5h7.4l.8-9.5" />
+    </svg>
+  );
 }
 
 function AssistantMessageContent({ content }: { content: string }) {
@@ -69,14 +84,14 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
         const res = await fetch(`/api/documents/${documentId}/messages`);
         if (res.ok) {
           const data = (await res.json()) as {
-            messages: Array<{ role: string; content: string }>;
+            messages: Array<{ id: string; role: string; content: string }>;
             chatSummary: string | null;
           };
           const loaded: ChatItem[] = data.messages
-            .filter((m): m is { role: "user" | "assistant"; content: string } =>
+            .filter((m): m is { id: string; role: "user" | "assistant"; content: string } =>
               m.role === "user" || m.role === "assistant",
             )
-            .map((m) => ({ kind: "message", key: nextKey(), role: m.role, content: m.content }));
+            .map((m) => ({ kind: "message", key: nextKey(), id: m.id, role: m.role, content: m.content }));
           const pendingDiffs: ChatItem[] = (initialDiffProposals ?? []).map((proposal) => ({
             kind: "diff",
             key: nextKey(),
@@ -267,6 +282,11 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
     setItems((prev) => prev.filter((item) => !(item.kind === "diff" && item.proposal.id === proposalId)));
   }
 
+  async function deleteMessage(messageId: string, itemKey: string) {
+    await fetch(`/api/documents/${documentId}/messages/${messageId}`, { method: "DELETE" });
+    setItems((prev) => prev.filter((item) => item.key !== itemKey));
+  }
+
   const isBusy = isStreaming || isRequestingDiff;
 
   return (
@@ -345,11 +365,23 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
                 );
               }
 
+              const isLastStreaming = isStreaming && index === items.length - 1;
+              const deleteBtn = item.id && !isLastStreaming ? (
+                <button
+                  onClick={() => void deleteMessage(item.id!, item.key)}
+                  className="invisible mt-1 shrink-0 rounded p-1 text-text-muted transition-colors hover:bg-background hover:text-red-500 group-hover:visible"
+                  aria-label="Delete message"
+                >
+                  <TrashIcon className="h-3.5 w-3.5" />
+                </button>
+              ) : null;
+
               return (
                 <div
                   key={item.key}
-                  className={`flex ${item.role === "user" ? "justify-end" : "justify-start"}`}
+                  className={`group flex items-start gap-1 ${item.role === "user" ? "justify-end" : "justify-start"}`}
                 >
+                  {item.role === "user" && deleteBtn}
                   <div
                     className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${
                       item.role === "user"
@@ -357,7 +389,7 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
                         : "border border-border bg-surface text-text-primary"
                     }`}
                   >
-                    {isStreaming && index === items.length - 1 && !item.content ? (
+                    {isLastStreaming && !item.content ? (
                       <span
                         className="inline-block h-4 w-2 animate-pulse bg-text-muted"
                         aria-label="Loading response"
@@ -368,6 +400,7 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
                       <p className="whitespace-pre-wrap">{item.content}</p>
                     )}
                   </div>
+                  {item.role === "assistant" && deleteBtn}
                 </div>
               );
             })}
