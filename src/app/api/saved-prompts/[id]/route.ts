@@ -12,8 +12,8 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const existing = await prisma.savedPrompt.findUnique({ where: { id } });
-  if (!existing || existing.userId !== session.user.id) {
+  const existing = await prisma.savedPrompt.findFirst({ where: { id, userId: session.user.id } });
+  if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -41,8 +41,8 @@ export async function DELETE(
   }
 
   const { id } = await params;
-  const existing = await prisma.savedPrompt.findUnique({ where: { id } });
-  if (!existing || existing.userId !== session.user.id) {
+  const existing = await prisma.savedPrompt.findFirst({ where: { id, userId: session.user.id } });
+  if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

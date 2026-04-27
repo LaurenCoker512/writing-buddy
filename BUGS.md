@@ -26,27 +26,27 @@ Work through these one at a time. Check off each item when resolved.
 
 ## P2 — Significant
 
-- [ ] **#5 `sessionStorage` side-channel between `Sidebar` and `DocumentWorkspace`**
+- [x] **#5 `sessionStorage` side-channel between `Sidebar` and `DocumentWorkspace`**
   `Sidebar.tsx` writes AI proposals to `sessionStorage.setItem(\`prepopulate-${id}\`, ...)` and `DocumentWorkspace.tsx` reads them back. This is SSR-unsafe, untyped, and fragile.
   **Fix:** Replace with URL query params or a server-side mechanism.
 
-- [ ] **#6 `Sidebar.tsx` is ~1900 lines with business logic in the UI**
+- [x] **#6 `Sidebar.tsx` is ~1900 lines with business logic in the UI**
   Contains 12 SVG icon components, 5 modal components, drag-and-drop components, multi-step API orchestration (create doc → trigger prepopulate-character → write sessionStorage), and the age gate flow.
   **Fix:** Split modals into `src/components/sidebar/SidebarModals.tsx`, icons into `src/components/icons/`, and extract business logic into custom hooks (`useDocumentCreate`, `useAgeGate`).
 
-- [ ] **#7 Version-cap logic duplicated**
+- [x] **#7 Version-cap logic duplicated**
   The "count versions, delete oldest if at cap, create new" pattern is copy-pasted between `versions/route.ts` and `restore/[versionId]/route.ts`.
   **Fix:** Extract `createVersionWithCap(documentId, tiptapJson, label?)` into a lib helper.
 
-- [ ] **#8 `AiMessage` / `ChatMessage` are identical duplicate types**
+- [x] **#8 `AiMessage` / `ChatMessage` are identical duplicate types**
   `src/lib/ai-provider.ts` exports `AiMessage` and `src/lib/ai-context.ts` exports `ChatMessage` — both are `{ role: "user" | "assistant"; content: string }`.
   **Fix:** Keep one, re-export the other.
 
-- [ ] **#9 No input length validation on free-text fields**
+- [x] **#9 No input length validation on free-text fields**
   `body.content` in chat, `body.sourceText` in ingest-canon/prepopulate-character, and `body.name` across all create routes have no upper-bound checks. A 1MB chat message is accepted.
   **Fix:** Add explicit max-length guards (e.g. 10,000 chars for source text, 200 for names) and return 400.
 
-- [ ] **#10 `savedPrompts` ownership check is inconsistent**
+- [x] **#10 `savedPrompts` ownership check is inconsistent**
   `saved-prompts/[id]/route.ts` uses `findUnique` + in-memory `userId` comparison. All other routes use `findFirst({ where: { id, userId } })`.
   **Fix:** Change to `prisma.savedPrompt.findFirst({ where: { id, userId: session.user.id } })`.
 

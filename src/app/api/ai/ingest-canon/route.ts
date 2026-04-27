@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { resolveProviderForUser, stripJsonFences } from "@/lib/ai-provider";
+import { AI_CONFIG } from "@/config/ai";
 import type { CanonProposal } from "@/types/diff";
 
 interface AiCanonItem {
@@ -56,6 +57,10 @@ export async function POST(req: NextRequest) {
 
   if (body.sourceText.trim().length === 0) {
     return NextResponse.json({ error: "Source text is required" }, { status: 400 });
+  }
+
+  if (body.sourceText.length > AI_CONFIG.MAX_SOURCE_TEXT_LENGTH) {
+    return NextResponse.json({ error: "Source text too long" }, { status: 400 });
   }
 
   const universe = await prisma.universe.findFirst({

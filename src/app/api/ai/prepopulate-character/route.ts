@@ -7,6 +7,7 @@ import type { TipTapNode } from "@/lib/tiptap-to-markdown";
 import type { TipTapDoc } from "@/lib/section-utils";
 import type { DiffProposal } from "@/types/diff";
 import { resolveProviderForUser, stripJsonFences } from "@/lib/ai-provider";
+import { AI_CONFIG } from "@/config/ai";
 import { findOwnedDocument } from "@/lib/db-helpers";
 
 interface AiDiffItem {
@@ -54,6 +55,10 @@ export async function POST(req: NextRequest) {
 
   if (body.sourceText.trim().length === 0) {
     return NextResponse.json({ error: "Source text is required" }, { status: 400 });
+  }
+
+  if (body.sourceText.length > AI_CONFIG.MAX_SOURCE_TEXT_LENGTH) {
+    return NextResponse.json({ error: "Source text too long" }, { status: 400 });
   }
 
   const document = await findOwnedDocument(body.documentId, session.user.id);

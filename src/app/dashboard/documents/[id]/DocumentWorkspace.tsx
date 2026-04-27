@@ -14,6 +14,7 @@ import { replaceSectionInTipTap, appendSectionToTipTap } from "@/lib/section-uti
 import type { TipTapDoc } from "@/lib/section-utils";
 import { markdownToTipTapNodes } from "@/lib/markdown-to-tiptap";
 import type { DiffProposal } from "@/types/diff";
+import { consumePrepopulateProposals } from "@/lib/prepopulate-store";
 
 const TipTapEditor = dynamic(() => import("@/components/TipTapEditor"), {
   ssr: false,
@@ -67,17 +68,9 @@ export default function DocumentWorkspace({
     initialParentDocumentName,
   );
   const [showParentSelector, setShowParentSelector] = useState(false);
-  const [initialDiffProposals] = useState<DiffProposal[]>(() => {
-    if (typeof window === "undefined") return [];
-    const stored = sessionStorage.getItem(`prepopulate-${documentId}`);
-    if (!stored) return [];
-    sessionStorage.removeItem(`prepopulate-${documentId}`);
-    try {
-      return JSON.parse(stored) as DiffProposal[];
-    } catch {
-      return [];
-    }
-  });
+  const [initialDiffProposals] = useState<DiffProposal[]>(() =>
+    consumePrepopulateProposals(documentId),
+  );
 
   const typeLabel = DOCUMENT_TYPE_LABELS[documentType as DocumentTypeValue] ?? documentType;
 

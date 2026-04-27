@@ -3,13 +3,9 @@ import type { TipTapNode } from "@/lib/tiptap-to-markdown";
 import { AI_CONFIG } from "@/config/ai";
 import { DOCUMENT_TYPE_ORDER } from "@/lib/documents";
 import type { DocumentTypeValue } from "@/lib/documents";
+import type { AiMessage } from "@/lib/ai-provider";
 
-export type MessageRole = "user" | "assistant";
-
-export interface ChatMessage {
-  role: MessageRole;
-  content: string;
-}
+export type { AiMessage as ChatMessage };
 
 export interface SiblingDocument {
   id: string;
@@ -77,8 +73,8 @@ const CONTENT_RESTRICTIONS: Record<string, string> = {
 
 export function buildTier1Context(
   tiptapJson: TipTapNode,
-  messages: ChatMessage[],
-): { documentMarkdown: string; recentMessages: ChatMessage[] } {
+  messages: AiMessage[],
+): { documentMarkdown: string; recentMessages: AiMessage[] } {
   const documentMarkdown = tiptapToMarkdown(tiptapJson);
   const recentMessages = messages.slice(-AI_CONFIG.CHAT_FULL_WINDOW);
   return { documentMarkdown, recentMessages };

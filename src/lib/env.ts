@@ -24,4 +24,4 @@ export const env = {
   NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET as string,
   NEXTAUTH_URL: process.env.NEXTAUTH_URL ?? "http://localhost:3000",
   OPENROUTER_ENCRYPTION_KEY: process.env.OPENROUTER_ENCRYPTION_KEY as string,
-} satisfies Record<EnvKey, string>;
+} satisfies Record<EnvKey, string> & { NEXTAUTH_URL: string };

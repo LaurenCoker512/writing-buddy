@@ -69,6 +69,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
+  if (body.content.length > AI_CONFIG.MAX_CHAT_CONTENT_LENGTH) {
+    return NextResponse.json({ error: "Message too long" }, { status: 400 });
+  }
+
   const document = await findOwnedDocument(body.documentId, session.user.id);
   if (!document) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

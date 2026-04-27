@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { isDocumentType, isValidDocumentScope } from "@/lib/documents";
 import { buildTemplate } from "@/lib/document-templates";
+import { AI_CONFIG } from "@/config/ai";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -63,6 +64,9 @@ export async function POST(req: NextRequest) {
 
   if (typeof body.name !== "string" || body.name.trim() === "") {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  }
+  if (body.name.length > AI_CONFIG.MAX_NAME_LENGTH) {
+    return NextResponse.json({ error: "Name too long" }, { status: 400 });
   }
   if (!isDocumentType(body.type)) {
     return NextResponse.json({ error: "Invalid document type" }, { status: 400 });

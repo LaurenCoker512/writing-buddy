@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -28,237 +28,36 @@ import type {
 } from "@/types/project-tree";
 import {
   DOCUMENT_SECTION_LABELS,
-  DOCUMENT_TYPE_LABELS,
   DOCUMENT_TYPE_ORDER,
-  type DocumentTypeValue,
 } from "@/lib/documents";
 import { calculateInsertOrder } from "@/lib/scene-order";
 import CanonIngestionModal from "@/components/CanonIngestionModal";
 import ContradictionCheckerModal from "@/components/ContradictionCheckerModal";
-import { shouldShowAgeGate } from "@/lib/age-gate";
-
-// ── Icons ─────────────────────────────────────────────────────────────────────
-
-function GlobeIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      className={className}
-      aria-hidden="true"
-    >
-      <circle cx="8" cy="8" r="6.5" />
-      <path d="M8 1.5C6.5 4 5.5 6 5.5 8s1 4 2.5 6.5M8 1.5C9.5 4 10.5 6 10.5 8s-1 4-2.5 6.5" />
-      <path d="M1.5 8h13" />
-    </svg>
-  );
-}
-
-function LayersIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M1.5 5.5L8 2l6.5 3.5-6.5 3.5L1.5 5.5z" />
-      <path d="M1.5 9.5L8 13l6.5-3.5" />
-    </svg>
-  );
-}
-
-function BookIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" />
-      <path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3" />
-    </svg>
-  );
-}
-
-function ChevronIcon({
-  expanded,
-  className,
-}: {
-  expanded: boolean;
-  className?: string;
-}) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      className={`transition-transform duration-150 ${expanded ? "rotate-90" : ""} ${className ?? ""}`}
-      aria-hidden="true"
-    >
-      <path d="M6 4l4 4-4 4" />
-    </svg>
-  );
-}
-
-function DotsIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      fill="currentColor"
-      className={className}
-      aria-hidden="true"
-    >
-      <circle cx="3" cy="8" r="1.25" />
-      <circle cx="8" cy="8" r="1.25" />
-      <circle cx="13" cy="8" r="1.25" />
-    </svg>
-  );
-}
-
-function PlusIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M8 3v10M3 8h10" />
-    </svg>
-  );
-}
-
-function CollapseIcon({
-  collapsed,
-  className,
-}: {
-  collapsed: boolean;
-  className?: string;
-}) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      className={className}
-      aria-hidden="true"
-    >
-      {collapsed ? (
-        <path d="M6 4l4 4-4 4" />
-      ) : (
-        <path d="M10 4L6 8l4 4" />
-      )}
-    </svg>
-  );
-}
-
-function PromptsIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M3 2h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" />
-      <path d="M5 6h6M5 9h4" />
-    </svg>
-  );
-}
-
-function BrainstormIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M8 1.5a5 5 0 0 1 3.5 8.5l-.5 1H5l-.5-1A5 5 0 0 1 8 1.5Z" />
-      <path d="M6 11v1.5a2 2 0 0 0 4 0V11" />
-    </svg>
-  );
-}
-
-function SettingsIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      className={className}
-      aria-hidden="true"
-    >
-      <circle cx="8" cy="8" r="2.5" />
-      <path d="M8 1.5v1.8M8 12.7v1.8M1.5 8h1.8M12.7 8h1.8M3.4 3.4l1.3 1.3M11.3 11.3l1.3 1.3M11.3 4.7l-1.3 1.3M4.7 11.3l-1.3 1.3" />
-    </svg>
-  );
-}
-
-function FileIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M3 2h7l3 3v9H3V2z" />
-      <path d="M10 2v3h3" />
-      <path d="M5.5 7h5M5.5 9.5h5M5.5 12h3" />
-    </svg>
-  );
-}
-
-function GripIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 16 16" fill="currentColor" className={className} aria-hidden="true">
-      <circle cx="5.5" cy="4" r="1.2" />
-      <circle cx="5.5" cy="8" r="1.2" />
-      <circle cx="5.5" cy="12" r="1.2" />
-      <circle cx="10.5" cy="4" r="1.2" />
-      <circle cx="10.5" cy="8" r="1.2" />
-      <circle cx="10.5" cy="12" r="1.2" />
-    </svg>
-  );
-}
-
-function GraphIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      className={className}
-      aria-hidden="true"
-    >
-      <circle cx="3" cy="8" r="2" />
-      <circle cx="13" cy="3.5" r="2" />
-      <circle cx="13" cy="12.5" r="2" />
-      <path d="M5 8h3.5M11 4.5l-2.5 3M11 11.5l-2.5-3" />
-    </svg>
-  );
-}
+import {
+  RenameModal,
+  DeleteModal,
+  NewProjectModal,
+  NewDocumentModal,
+  type ModalState,
+  type CreateData,
+  type NewDocumentState,
+} from "@/components/sidebar/SidebarModals";
+import {
+  GlobeIcon,
+  LayersIcon,
+  BookIcon,
+  ChevronIcon,
+  DotsIcon,
+  PlusIcon,
+  CollapseIcon,
+  PromptsIcon,
+  BrainstormIcon,
+  SettingsIcon,
+  FileIcon,
+  GripIcon,
+  GraphIcon,
+} from "@/components/icons";
+import { useDocumentCreate } from "@/hooks/useDocumentCreate";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -272,32 +71,9 @@ interface ContextMenuState {
   docType?: string;
 }
 
-interface ModalState {
-  id: string;
-  type: NodeType;
-  name: string;
-}
-
-interface CreateData {
-  itemType: NodeType;
-  name: string;
-  mode: string;
-  rating: string;
-  sourceTitle?: string;
-  universeId?: string;
-  seriesId?: string;
-}
-
 interface CanonIngestionState {
   universeId: string;
   universeName: string;
-}
-
-interface NewDocumentState {
-  parentId: string;
-  parentName: string;
-  parentType: "story" | "universe";
-  storyMode?: string;
 }
 
 // ── Context Menu ──────────────────────────────────────────────────────────────
@@ -392,575 +168,6 @@ function ContextMenuDropdown({
       >
         Delete
       </button>
-    </div>
-  );
-}
-
-// ── Rename Modal ──────────────────────────────────────────────────────────────
-
-function RenameModal({
-  modal,
-  onConfirm,
-  onClose,
-}: {
-  modal: ModalState;
-  onConfirm: (name: string) => void;
-  onClose: () => void;
-}) {
-  const [value, setValue] = useState(modal.name);
-  const [saving, setSaving] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    inputRef.current?.select();
-  }, []);
-
-  const submit = async () => {
-    const trimmed = value.trim();
-    if (!trimmed || trimmed === modal.name) {
-      onClose();
-      return;
-    }
-    setSaving(true);
-    onConfirm(trimmed);
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-sm rounded-lg border border-border bg-surface p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="mb-4 font-heading text-lg font-semibold text-text-primary">
-          Rename {modal.type}
-        </h2>
-        <input
-          ref={inputRef}
-          type="text"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") submit();
-            if (e.key === "Escape") onClose();
-          }}
-          className="mb-4 w-full rounded border border-border bg-background px-3 py-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-accent"
-          aria-label="New name"
-        />
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="rounded border border-border px-4 py-2 text-sm text-text-muted hover:bg-background"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={submit}
-            disabled={saving || !value.trim()}
-            className="rounded bg-accent px-4 py-2 text-sm text-white hover:bg-accent-hover disabled:opacity-50"
-          >
-            {saving ? "Saving…" : "Rename"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Delete Modal ──────────────────────────────────────────────────────────────
-
-function DeleteModal({
-  modal,
-  onConfirm,
-  onClose,
-}: {
-  modal: ModalState;
-  onConfirm: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-sm rounded-lg border border-border bg-surface p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="mb-2 font-heading text-lg font-semibold text-text-primary">
-          Delete {modal.type}?
-        </h2>
-        <p className="mb-6 text-sm text-text-muted">
-          {modal.type === "document" ? (
-            <>
-              &ldquo;{modal.name}&rdquo; will be permanently deleted along with
-              its versions and chat history.
-            </>
-          ) : (
-            <>
-              &ldquo;{modal.name}&rdquo; will be permanently deleted. Children
-              (series, stories) will be orphaned, not deleted.
-            </>
-          )}
-        </p>
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="rounded border border-border px-4 py-2 text-sm text-text-muted hover:bg-background"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className="rounded bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Age Gate Modal ────────────────────────────────────────────────────────────
-
-function AgeGateModal({
-  onConfirm,
-  onClose,
-  confirming,
-}: {
-  onConfirm: () => void;
-  onClose: () => void;
-  confirming: boolean;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40"
-      onClick={(e) => {
-        e.stopPropagation();
-        onClose();
-      }}
-    >
-      <div
-        className="w-full max-w-sm rounded-lg border border-border bg-surface p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-        data-testid="age-gate-modal"
-      >
-        <h2 className="mb-2 font-heading text-lg font-semibold text-text-primary">
-          Age Confirmation Required
-        </h2>
-        <p className="mb-6 text-sm text-text-muted">
-          Explicit-rated (E) content is intended for adults only. By continuing,
-          you confirm you are 18 years of age or older.
-        </p>
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            disabled={confirming}
-            className="rounded border border-border px-4 py-2 text-sm text-text-muted hover:bg-background disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={confirming}
-            className="rounded bg-accent px-4 py-2 text-sm text-white hover:bg-accent-hover disabled:opacity-50"
-          >
-            {confirming ? "Confirming…" : "I am 18+, Continue"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── New Project Modal ─────────────────────────────────────────────────────────
-
-function NewProjectModal({
-  tree,
-  onConfirm,
-  onClose,
-}: {
-  tree: ProjectTree;
-  onConfirm: (data: CreateData) => void;
-  onClose: () => void;
-}) {
-  const [itemType, setItemType] = useState<NodeType>("story");
-  const [name, setName] = useState("");
-  const [mode, setMode] = useState("ORIGINAL");
-  const [rating, setRating] = useState("G");
-  const [sourceTitle, setSourceTitle] = useState("");
-  const [universeId, setUniverseId] = useState("");
-  const [seriesId, setSeriesId] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [explicitEnabled, setExplicitEnabled] = useState<boolean | null>(null);
-  const [showAgeGate, setShowAgeGate] = useState(false);
-  const [enablingExplicit, setEnablingExplicit] = useState(false);
-
-  const handleRatingClick = async (r: string) => {
-    if (r !== "E") {
-      setRating(r);
-      return;
-    }
-    let enabled = explicitEnabled;
-    if (enabled === null) {
-      const res = await fetch("/api/account");
-      if (res.ok) {
-        const data = (await res.json()) as { explicitEnabled: boolean };
-        enabled = data.explicitEnabled;
-        setExplicitEnabled(enabled);
-      }
-    }
-    if (shouldShowAgeGate(enabled ?? false, "E")) {
-      setShowAgeGate(true);
-    } else {
-      setRating("E");
-    }
-  };
-
-  const handleAgeGateConfirm = async () => {
-    setEnablingExplicit(true);
-    await fetch("/api/account/explicit-enable", { method: "PATCH" });
-    setExplicitEnabled(true);
-    setShowAgeGate(false);
-    setRating("E");
-    setEnablingExplicit(false);
-  };
-
-  const submit = () => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    setSaving(true);
-    onConfirm({
-      itemType,
-      name: trimmed,
-      mode,
-      rating,
-      sourceTitle: mode === "FANFIC" && sourceTitle.trim() ? sourceTitle.trim() : undefined,
-      universeId: universeId || undefined,
-      seriesId: seriesId || undefined,
-    });
-  };
-
-  const allSeries = [
-    ...tree.universes.flatMap((u) => u.series),
-    ...tree.standaloneSeries,
-  ];
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-sm rounded-lg border border-border bg-surface p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-        data-testid="new-project-modal"
-      >
-        <h2 className="mb-4 font-heading text-lg font-semibold text-text-primary">
-          New Project
-        </h2>
-
-        {/* Type */}
-        <fieldset className="mb-4">
-          <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-text-muted">
-            Type
-          </legend>
-          <div className="flex gap-2">
-            {(["universe", "series", "story"] as NodeType[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => setItemType(t)}
-                className={`flex-1 rounded border px-3 py-1.5 text-sm capitalize transition-colors ${
-                  itemType === t
-                    ? "border-accent bg-accent text-white"
-                    : "border-border text-text-muted hover:border-accent hover:text-text-primary"
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-
-        {/* Name */}
-        <div className="mb-4">
-          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-text-muted">
-            Name
-          </label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") submit();
-              if (e.key === "Escape") onClose();
-            }}
-            autoFocus
-            className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-accent"
-            aria-label="Project name"
-          />
-        </div>
-
-        {/* Parent Universe (for series and story) */}
-        {(itemType === "series" || itemType === "story") &&
-          tree.universes.length > 0 && (
-            <div className="mb-4">
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-text-muted">
-                Universe (optional)
-              </label>
-              <select
-                value={universeId}
-                onChange={(e) => {
-                  setUniverseId(e.target.value);
-                  setSeriesId("");
-                }}
-                className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-accent"
-              >
-                <option value="">— None —</option>
-                {tree.universes.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-        {/* Parent Series (for story) */}
-        {itemType === "story" && allSeries.length > 0 && (
-          <div className="mb-4">
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-text-muted">
-              Series (optional)
-            </label>
-            <select
-              value={seriesId}
-              onChange={(e) => setSeriesId(e.target.value)}
-              className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-accent"
-            >
-              <option value="">— None —</option>
-              {allSeries.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* Mode */}
-        <div className="mb-4">
-          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-text-muted">
-            Mode
-          </label>
-          <div className="flex gap-2">
-            {["ORIGINAL", "FANFIC"].map((m) => (
-              <button
-                key={m}
-                onClick={() => setMode(m)}
-                className={`flex-1 rounded border px-3 py-1.5 text-sm transition-colors ${
-                  mode === m
-                    ? "border-accent bg-accent text-white"
-                    : "border-border text-text-muted hover:border-accent hover:text-text-primary"
-                }`}
-              >
-                {m === "ORIGINAL" ? "Original" : "Fanfic"}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Source Title (Fanfic only) */}
-        {mode === "FANFIC" && (
-          <div className="mb-4">
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-text-muted">
-              Source Title (optional)
-            </label>
-            <input
-              type="text"
-              value={sourceTitle}
-              onChange={(e) => setSourceTitle(e.target.value)}
-              placeholder="e.g. Harry Potter, Star Wars…"
-              className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-accent"
-              aria-label="Source title"
-            />
-          </div>
-        )}
-
-        {/* Rating */}
-        <div className="mb-6">
-          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-text-muted">
-            Rating
-          </label>
-          <div className="flex gap-2">
-            {["G", "T", "M", "E"].map((r) => (
-              <button
-                key={r}
-                onClick={() => void handleRatingClick(r)}
-                className={`flex-1 rounded border px-3 py-1.5 text-sm transition-colors ${
-                  rating === r
-                    ? "border-accent bg-accent text-white"
-                    : "border-border text-text-muted hover:border-accent hover:text-text-primary"
-                }`}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {showAgeGate && (
-          <AgeGateModal
-            onConfirm={() => void handleAgeGateConfirm()}
-            onClose={() => setShowAgeGate(false)}
-            confirming={enablingExplicit}
-          />
-        )}
-
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="rounded border border-border px-4 py-2 text-sm text-text-muted hover:bg-background"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={submit}
-            disabled={saving || !name.trim()}
-            className="rounded bg-accent px-4 py-2 text-sm text-white hover:bg-accent-hover disabled:opacity-50"
-          >
-            {saving ? "Creating…" : "Create"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── New Document Modal ────────────────────────────────────────────────────────
-
-const UNIVERSE_DOCUMENT_TYPES = DOCUMENT_TYPE_ORDER.filter((t) => t !== "SCENE");
-
-function NewDocumentModal({
-  parentName,
-  parentType,
-  storyMode,
-  onConfirm,
-  onClose,
-}: {
-  parentName: string;
-  parentType: "story" | "universe";
-  storyMode?: string;
-  onConfirm: (type: DocumentTypeValue, name: string, sourceText?: string) => void;
-  onClose: () => void;
-}) {
-  const allowedTypes = parentType === "universe" ? UNIVERSE_DOCUMENT_TYPES : DOCUMENT_TYPE_ORDER;
-  const [docType, setDocType] = useState<DocumentTypeValue>("CHARACTER");
-  const [name, setName] = useState("");
-  const [sourceText, setSourceText] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const showSourceText = storyMode === "FANFIC" && docType === "CHARACTER";
-
-  const submit = () => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    setSaving(true);
-    onConfirm(docType, trimmed, showSourceText && sourceText.trim() ? sourceText.trim() : undefined);
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-sm rounded-lg border border-border bg-surface p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-        data-testid="new-document-modal"
-      >
-        <h2 className="mb-1 font-heading text-lg font-semibold text-text-primary">
-          New Document
-        </h2>
-        <p className="mb-4 text-xs text-text-muted">In: {parentName}</p>
-
-        <fieldset className="mb-4">
-          <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-text-muted">
-            Type
-          </legend>
-          <div className="grid grid-cols-3 gap-1.5">
-            {allowedTypes.map((type) => (
-              <button
-                key={type}
-                onClick={() => setDocType(type)}
-                className={`rounded border px-2 py-1.5 text-xs transition-colors ${
-                  docType === type
-                    ? "border-accent bg-accent text-white"
-                    : "border-border text-text-muted hover:border-accent hover:text-text-primary"
-                }`}
-              >
-                {DOCUMENT_TYPE_LABELS[type]}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-
-        <div className="mb-4">
-          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-text-muted">
-            Name
-          </label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") submit();
-              if (e.key === "Escape") onClose();
-            }}
-            autoFocus
-            className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-accent"
-            aria-label="Document name"
-          />
-        </div>
-
-        {showSourceText && (
-          <div className="mb-6">
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-text-muted">
-              Source Material (optional)
-            </label>
-            <p className="mb-1.5 text-xs text-text-muted">
-              Paste wiki text or bios to pre-populate the document via AI diff.
-            </p>
-            <textarea
-              value={sourceText}
-              onChange={(e) => setSourceText(e.target.value)}
-              rows={4}
-              className="w-full resize-none rounded border border-border bg-background px-3 py-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-accent"
-              aria-label="Source material for character pre-population"
-            />
-          </div>
-        )}
-
-        {!showSourceText && <div className="mb-6" />}
-
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="rounded border border-border px-4 py-2 text-sm text-text-muted hover:bg-background"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={submit}
-            disabled={saving || !name.trim()}
-            className="rounded bg-accent px-4 py-2 text-sm text-white hover:bg-accent-hover disabled:opacity-50"
-          >
-            {saving ? "Creating…" : "Create"}
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -1150,8 +357,13 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   }, []);
 
   useEffect(() => {
-    fetchTree();
+    void fetchTree();
   }, [fetchTree]);
+
+  const { createDocument } = useDocumentCreate({
+    onComplete: () => setNewDocumentModal(null),
+    onTreeRefresh: () => void fetchTree(),
+  });
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
@@ -1200,7 +412,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       body: JSON.stringify({ name }),
     });
     setRenameModal(null);
-    fetchTree();
+    void fetchTree();
   };
 
   const handleDelete = async () => {
@@ -1209,42 +421,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       method: "DELETE",
     });
     setDeleteModal(null);
-    fetchTree();
-  };
-
-  const handleDocumentCreate = async (
-    parent: NewDocumentState,
-    type: DocumentTypeValue,
-    name: string,
-    sourceText?: string,
-  ) => {
-    const scopeBody =
-      parent.parentType === "universe"
-        ? { universeId: parent.parentId }
-        : { storyId: parent.parentId };
-    const res = await fetch("/api/documents", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type, name, ...scopeBody }),
-    });
-    setNewDocumentModal(null);
-    fetchTree();
-
-    if (sourceText && res.ok) {
-      const created = (await res.json()) as { id: string };
-      const prepopRes = await fetch("/api/ai/prepopulate-character", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ documentId: created.id, sourceText }),
-      });
-      if (prepopRes.ok) {
-        const data = (await prepopRes.json()) as { proposals: unknown[] };
-        if (Array.isArray(data.proposals) && data.proposals.length > 0) {
-          sessionStorage.setItem(`prepopulate-${created.id}`, JSON.stringify(data.proposals));
-        }
-      }
-      router.push(`/dashboard/documents/${created.id}`);
-    }
+    void fetchTree();
   };
 
   const handleDuplicateAsAu = async () => {
@@ -1253,7 +430,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       method: "POST",
     });
     setContextMenu(null);
-    if (res.ok) fetchTree();
+    if (res.ok) void fetchTree();
   };
 
   const handleCreate = async (data: CreateData) => {
@@ -1283,7 +460,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       body: JSON.stringify(body),
     });
     setNewProjectModal(false);
-    fetchTree();
+    void fetchTree();
     if (!res.ok) return;
     const created = (await res.json()) as { id: string };
     if (data.itemType === "universe" && data.mode === "FANFIC") {
@@ -1415,7 +592,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           <li key={`map-${mapHref}`}>
             <div style={{ paddingLeft: `${depth * 12 + 8}px` }}>
               <Link
-                href={mapHref}
+                href={{ pathname: mapHref }}
                 className={`flex items-center gap-1.5 rounded px-2 py-1.5 text-sm transition-colors ${
                   pathname === mapHref
                     ? "bg-accent/10 text-accent"
@@ -1866,7 +1043,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           parentType={newDocumentModal.parentType}
           storyMode={newDocumentModal.storyMode}
           onConfirm={(type, name, sourceText) =>
-            void handleDocumentCreate(newDocumentModal, type, name, sourceText)
+            void createDocument(newDocumentModal, type, name, sourceText)
           }
           onClose={() => setNewDocumentModal(null)}
         />

@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { findOwnedDocument } from "@/lib/db-helpers";
+import { AI_CONFIG } from "@/config/ai";
 
 type Params = { params: { id: string } };
 
@@ -37,6 +38,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   } = {};
 
   if (typeof body.name === "string" && body.name.trim() !== "") {
+    if (body.name.length > AI_CONFIG.MAX_NAME_LENGTH) {
+      return NextResponse.json({ error: "Name too long" }, { status: 400 });
+    }
     data.name = body.name.trim();
   }
   if (body.order !== undefined) {

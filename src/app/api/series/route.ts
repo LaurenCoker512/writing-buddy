@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isMode, isRating, toOptionalString } from "@/lib/hierarchy";
+import { AI_CONFIG } from "@/config/ai";
 
 export async function GET() {
   const session = await auth();
@@ -27,6 +28,9 @@ export async function POST(req: NextRequest) {
 
   if (typeof body.name !== "string" || body.name.trim() === "") {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  }
+  if (body.name.length > AI_CONFIG.MAX_NAME_LENGTH) {
+    return NextResponse.json({ error: "Name too long" }, { status: 400 });
   }
   if (!isMode(body.mode)) {
     return NextResponse.json({ error: "Invalid mode" }, { status: 400 });

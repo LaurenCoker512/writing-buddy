@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { isRating } from "@/lib/hierarchy";
 import { buildPlotTemplateWithPremise } from "@/lib/document-templates";
+import { AI_CONFIG } from "@/config/ai";
 
 export async function POST(
   req: NextRequest,
@@ -24,6 +25,9 @@ export async function POST(
 
   if (typeof body.name !== "string" || body.name.trim() === "") {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  }
+  if (body.name.length > AI_CONFIG.MAX_NAME_LENGTH) {
+    return NextResponse.json({ error: "Name too long" }, { status: 400 });
   }
   if (!isRating(body.rating)) {
     return NextResponse.json({ error: "Invalid rating" }, { status: 400 });

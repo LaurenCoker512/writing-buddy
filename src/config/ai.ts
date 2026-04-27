@@ -70,6 +70,19 @@ export const AI_CONFIG = {
   /** Number of loglines generated per brainstorm batch. */
   BRAINSTORM_LOGLINE_COUNT: 5,
 
+  // ---------------------------------------------------------------------------
+  // Input length limits
+  // ---------------------------------------------------------------------------
+
+  /** Maximum characters allowed in a chat message. */
+  MAX_CHAT_CONTENT_LENGTH: 10_000,
+
+  /** Maximum characters allowed for source text in ingest/prepopulate endpoints. */
+  MAX_SOURCE_TEXT_LENGTH: 10_000,
+
+  /** Maximum characters allowed for entity names (stories, documents, etc.). */
+  MAX_NAME_LENGTH: 200,
+
 } as const;
 
 // Fanfic mode (v1): no cache constants needed.
