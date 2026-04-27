@@ -69,6 +69,12 @@ const RATING_DESCRIPTIONS: Record<string, string> = {
   E: "explicit adult content",
 };
 
+const CONTENT_RESTRICTIONS: Record<string, string> = {
+  G: "Keep all content suitable for general audiences. Avoid adult themes, violence, and mature content.",
+  T: "Keep content appropriate for teen readers. Mild themes are acceptable, but avoid explicit content.",
+  M: "Mature themes are acceptable, but avoid explicit sexual content.",
+};
+
 export function buildTier1Context(
   tiptapJson: TipTapNode,
   messages: ChatMessage[],
@@ -95,6 +101,7 @@ export function buildSystemPrompt(
   chatSummary?: string | null,
   tier2Context?: string | null,
   canonContext?: string | null,
+  explicitEnabled?: boolean,
 ): string {
   const modeLabel = mode === "FANFIC" ? "fanfiction" : "original fiction";
   const ratingDesc = RATING_DESCRIPTIONS[rating] ?? "general";
@@ -103,6 +110,12 @@ export function buildSystemPrompt(
     `You are a writing assistant helping with a ${modeLabel} story (rated ${rating} — ${ratingDesc}).`,
     "Your role is to help the writer develop characters, plot, worldbuilding, and prose. Be creative, collaborative, and responsive to the writer's vision.",
   ];
+
+  const contentRestriction =
+    rating === "E" && explicitEnabled === true ? null : (CONTENT_RESTRICTIONS[rating] ?? null);
+  if (contentRestriction !== null) {
+    parts.push(contentRestriction);
+  }
 
   if (mode === "FANFIC" && canonContext) {
     parts.push(

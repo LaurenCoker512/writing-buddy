@@ -34,6 +34,7 @@ import {
 } from "@/lib/documents";
 import { calculateInsertOrder } from "@/lib/scene-order";
 import CanonIngestionModal from "@/components/CanonIngestionModal";
+import { shouldShowAgeGate } from "@/lib/age-gate";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -514,6 +515,58 @@ function DeleteModal({
   );
 }
 
+// ── Age Gate Modal ────────────────────────────────────────────────────────────
+
+function AgeGateModal({
+  onConfirm,
+  onClose,
+  confirming,
+}: {
+  onConfirm: () => void;
+  onClose: () => void;
+  confirming: boolean;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
+    >
+      <div
+        className="w-full max-w-sm rounded-lg border border-border bg-surface p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+        data-testid="age-gate-modal"
+      >
+        <h2 className="mb-2 font-heading text-lg font-semibold text-text-primary">
+          Age Confirmation Required
+        </h2>
+        <p className="mb-6 text-sm text-text-muted">
+          Explicit-rated (E) content is intended for adults only. By continuing,
+          you confirm you are 18 years of age or older.
+        </p>
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            disabled={confirming}
+            className="rounded border border-border px-4 py-2 text-sm text-text-muted hover:bg-background disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={confirming}
+            className="rounded bg-accent px-4 py-2 text-sm text-white hover:bg-accent-hover disabled:opacity-50"
+          >
+            {confirming ? "Confirming…" : "I am 18+, Continue"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── New Project Modal ─────────────────────────────────────────────────────────
 
 function NewProjectModal({
@@ -533,6 +586,39 @@ function NewProjectModal({
   const [universeId, setUniverseId] = useState("");
   const [seriesId, setSeriesId] = useState("");
   const [saving, setSaving] = useState(false);
+  const [explicitEnabled, setExplicitEnabled] = useState<boolean | null>(null);
+  const [showAgeGate, setShowAgeGate] = useState(false);
+  const [enablingExplicit, setEnablingExplicit] = useState(false);
+
+  const handleRatingClick = async (r: string) => {
+    if (r !== "E") {
+      setRating(r);
+      return;
+    }
+    let enabled = explicitEnabled;
+    if (enabled === null) {
+      const res = await fetch("/api/account");
+      if (res.ok) {
+        const data = (await res.json()) as { explicitEnabled: boolean };
+        enabled = data.explicitEnabled;
+        setExplicitEnabled(enabled);
+      }
+    }
+    if (shouldShowAgeGate(enabled ?? false, "E")) {
+      setShowAgeGate(true);
+    } else {
+      setRating("E");
+    }
+  };
+
+  const handleAgeGateConfirm = async () => {
+    setEnablingExplicit(true);
+    await fetch("/api/account/explicit-enable", { method: "PATCH" });
+    setExplicitEnabled(true);
+    setShowAgeGate(false);
+    setRating("E");
+    setEnablingExplicit(false);
+  };
 
   const submit = () => {
     const trimmed = name.trim();
@@ -703,7 +789,7 @@ function NewProjectModal({
             {["G", "T", "M", "E"].map((r) => (
               <button
                 key={r}
-                onClick={() => setRating(r)}
+                onClick={() => void handleRatingClick(r)}
                 className={`flex-1 rounded border px-3 py-1.5 text-sm transition-colors ${
                   rating === r
                     ? "border-accent bg-accent text-white"
@@ -715,6 +801,14 @@ function NewProjectModal({
             ))}
           </div>
         </div>
+
+        {showAgeGate && (
+          <AgeGateModal
+            onConfirm={() => void handleAgeGateConfirm()}
+            onClose={() => setShowAgeGate(false)}
+            confirming={enablingExplicit}
+          />
+        )}
 
         <div className="flex justify-end gap-2">
           <button

@@ -550,7 +550,7 @@ Each phase produces a deployable application. Later phases layer features onto a
 
 ---
 
-## Phase 22: Content Rating & Explicit Unlock ☐
+## Phase 22: Content Rating & Explicit Unlock ✅
 
 **Goal:** Project ratings are reflected in AI calibration and explicit content requires a one-time age gate.
 

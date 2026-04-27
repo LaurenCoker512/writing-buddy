@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { openRouterKey: true },
+    select: { openRouterKey: true, explicitEnabled: true },
   });
 
   if (!user?.openRouterKey) {
@@ -210,6 +210,7 @@ export async function POST(req: NextRequest) {
     document.chatSummary,
     tier2Context || null,
     canonContext,
+    user.explicitEnabled,
   );
 
   const openRouterResponse = await fetch(

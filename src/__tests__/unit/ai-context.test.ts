@@ -119,6 +119,36 @@ describe("buildSystemPrompt", () => {
     const prompt = buildSystemPrompt("# Doc", "FANFIC", "T", null, null, null);
     expect(prompt).not.toContain("Canon reference documents");
   });
+
+  test("G-rated prompt contains content restriction language", () => {
+    const prompt = buildSystemPrompt("# Doc", "ORIGINAL", "G");
+    expect(prompt).toContain("general audiences");
+  });
+
+  test("T-rated prompt contains content restriction language", () => {
+    const prompt = buildSystemPrompt("# Doc", "ORIGINAL", "T");
+    expect(prompt).toContain("teen readers");
+  });
+
+  test("M-rated prompt contains content restriction language", () => {
+    const prompt = buildSystemPrompt("# Doc", "ORIGINAL", "M");
+    expect(prompt).toContain("explicit sexual content");
+  });
+
+  test("E-rated prompt with explicitEnabled omits content restriction language", () => {
+    const prompt = buildSystemPrompt("# Doc", "ORIGINAL", "E", null, null, null, true);
+    expect(prompt).not.toContain("general audiences");
+    expect(prompt).not.toContain("teen readers");
+    expect(prompt).not.toContain("explicit sexual content");
+    expect(prompt).not.toContain("avoid");
+  });
+
+  test("E-rated prompt without explicitEnabled also omits content restriction", () => {
+    const prompt = buildSystemPrompt("# Doc", "ORIGINAL", "E", null, null, null, false);
+    expect(prompt).not.toContain("general audiences");
+    expect(prompt).not.toContain("teen readers");
+    expect(prompt).not.toContain("explicit sexual content");
+  });
 });
 
 describe("buildCanonContext", () => {
