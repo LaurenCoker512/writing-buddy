@@ -4,28 +4,29 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { findOwnedDocument } from "@/lib/db-helpers";
 import { AI_CONFIG } from "@/config/ai";
+import type { RouteParams } from "@/types/route";
 
-type Params = { params: { id: string } };
-
-export async function GET(_req: NextRequest, { params }: Params) {
+export async function GET(_req: NextRequest, { params }: RouteParams<{ id: string }>) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const document = await findOwnedDocument(params.id, session.user.id);
+  const { id } = await params;
+  const document = await findOwnedDocument(id, session.user.id);
   if (!document) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   return NextResponse.json(document);
 }
 
-export async function PATCH(req: NextRequest, { params }: Params) {
+export async function PATCH(req: NextRequest, { params }: RouteParams<{ id: string }>) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const existing = await findOwnedDocument(params.id, session.user.id);
+  const { id } = await params;
+  const existing = await findOwnedDocument(id, session.user.id);
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = (await req.json()) as Record<string, unknown>;
@@ -107,23 +108,24 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const updated = await prisma.document.update({
-    where: { id: params.id },
+    where: { id },
     data,
   });
 
   return NextResponse.json(updated);
 }
 
-export async function DELETE(_req: NextRequest, { params }: Params) {
+export async function DELETE(_req: NextRequest, { params }: RouteParams<{ id: string }>) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const existing = await findOwnedDocument(params.id, session.user.id);
+  const { id } = await params;
+  const existing = await findOwnedDocument(id, session.user.id);
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await prisma.document.delete({ where: { id: params.id } });
+  await prisma.document.delete({ where: { id } });
 
   return new NextResponse(null, { status: 204 });
 }

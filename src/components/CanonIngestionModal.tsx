@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Modal from "@/components/ui/Modal";
 import { markdownToTipTapNodes } from "@/lib/markdown-to-tiptap";
 import type { CanonProposal } from "@/types/diff";
 
@@ -131,15 +132,13 @@ export default function CanonIngestionModal({
   const allDone = proposals !== null && proposals.length === 0;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={onClose}
+    <Modal
+      maxWidth="lg"
+      padding={false}
+      className="flex max-h-[90vh] flex-col"
+      onClose={onClose}
+      data-testid="canon-ingestion-modal"
     >
-      <div
-        className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-lg border border-border bg-surface shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-        data-testid="canon-ingestion-modal"
-      >
         <div className="border-b border-border px-6 py-4">
           <h2 className="font-heading text-lg font-semibold text-text-primary">
             Import Canon Text
@@ -207,7 +206,6 @@ export default function CanonIngestionModal({
             </button>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

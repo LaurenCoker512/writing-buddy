@@ -257,6 +257,7 @@ interface TipTapEditorProps {
   onSaveStatusChange: (status: SaveStatus) => void;
   patchFn?: PatchFn;
   externalContent?: { json: object; nonce: number };
+  contentRef?: React.MutableRefObject<object>;
 }
 
 export default function TipTapEditor({
@@ -267,6 +268,7 @@ export default function TipTapEditor({
   onSaveStatusChange,
   patchFn = defaultPatchFn,
   externalContent,
+  contentRef,
 }: TipTapEditorProps) {
   const autosaveRef = useRef(
     createAutosave(documentId, AUTOSAVE_DELAY_MS, async (id, json) => {
@@ -296,7 +298,9 @@ export default function TipTapEditor({
     ],
     content: initialJson,
     onUpdate({ editor: ed }) {
-      autosaveRef.current.trigger(ed.getJSON());
+      const json = ed.getJSON();
+      if (contentRef !== undefined) contentRef.current = json;
+      autosaveRef.current.trigger(json);
     },
     editorProps: {
       attributes: {
@@ -314,6 +318,7 @@ export default function TipTapEditor({
     if (externalContent.nonce === appliedNonceRef.current) return;
     appliedNonceRef.current = externalContent.nonce;
     editor.commands.setContent(externalContent.json);
+    if (contentRef !== undefined) contentRef.current = externalContent.json;
     autosaveRef.current.trigger(externalContent.json);
   }, [editor, externalContent]);
 

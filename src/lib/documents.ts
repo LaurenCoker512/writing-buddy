@@ -17,6 +17,17 @@ export function isDocumentType(value: unknown): value is DocumentTypeValue {
   );
 }
 
+export function buildScopeParam(
+  storyId: string | null | undefined,
+  seriesId: string | null | undefined,
+  universeId: string | null | undefined,
+): string | null {
+  if (storyId) return `storyId=${storyId}`;
+  if (seriesId) return `seriesId=${seriesId}`;
+  if (universeId) return `universeId=${universeId}`;
+  return null;
+}
+
 export function isValidDocumentScope(
   storyId: string | null,
   seriesId: string | null,

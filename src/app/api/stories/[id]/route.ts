@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { isMode, isRating, toOptionalString } from "@/lib/hierarchy";
+import { buildHierarchyPatchData } from "@/lib/hierarchy";
+import type { RouteParams } from "@/types/route";
 
-type Params = { params: { id: string } };
-
-export async function GET(_req: NextRequest, { params }: Params) {
+export async function GET(_req: NextRequest, { params }: RouteParams<{ id: string }>) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { id } = await params;
   const story = await prisma.story.findFirst({
-    where: { id: params.id, userId: session.user.id },
+    where: { id, userId: session.user.id },
   });
 
   if (!story) {
@@ -22,72 +22,49 @@ export async function GET(_req: NextRequest, { params }: Params) {
   return NextResponse.json(story);
 }
 
-export async function PATCH(req: NextRequest, { params }: Params) {
+export async function PATCH(req: NextRequest, { params }: RouteParams<{ id: string }>) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { id } = await params;
   const existing = await prisma.story.findFirst({
-    where: { id: params.id, userId: session.user.id },
+    where: { id, userId: session.user.id },
   });
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const body = (await req.json()) as Record<string, unknown>;
-  const data: {
-    name?: string;
-    mode?: "ORIGINAL" | "FANFIC";
-    rating?: "G" | "T" | "M" | "E";
-    sourceTitle?: string | null;
-  } = {};
-
-  if (typeof body.name === "string" && body.name.trim() !== "") {
-    data.name = body.name.trim();
-  }
-  if (body.mode !== undefined) {
-    if (!isMode(body.mode)) {
-      return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
-    }
-    data.mode = body.mode;
-  }
-  if (body.rating !== undefined) {
-    if (!isRating(body.rating)) {
-      return NextResponse.json({ error: "Invalid rating" }, { status: 400 });
-    }
-    data.rating = body.rating;
-  }
-  if (body.sourceTitle !== undefined) {
-    data.sourceTitle = toOptionalString(body.sourceTitle);
-  }
-
-  if (Object.keys(data).length === 0) {
-    return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+  const result = buildHierarchyPatchData(body);
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
   const updated = await prisma.story.update({
-    where: { id: params.id },
-    data,
+    where: { id },
+    data: result.data,
   });
 
   return NextResponse.json(updated);
 }
 
-export async function DELETE(_req: NextRequest, { params }: Params) {
+export async function DELETE(_req: NextRequest, { params }: RouteParams<{ id: string }>) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { id } = await params;
   const existing = await prisma.story.findFirst({
-    where: { id: params.id, userId: session.user.id },
+    where: { id, userId: session.user.id },
   });
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  await prisma.story.delete({ where: { id: params.id } });
+  await prisma.story.delete({ where: { id } });
 
   return new NextResponse(null, { status: 204 });
 }

@@ -52,6 +52,7 @@ export async function ensureContentSummariesFresh(
   });
 
   const stale = documents.filter(isStale);
+  const updatedSummaries = new Map<string, string>();
 
   await Promise.all(
     stale.map(async (doc) => {
@@ -67,7 +68,7 @@ export async function ensureContentSummariesFresh(
         },
       });
 
-      doc.contentSummary = summary;
+      updatedSummaries.set(doc.id, summary);
     }),
   );
 
@@ -75,6 +76,6 @@ export async function ensureContentSummariesFresh(
     id: doc.id,
     type: doc.type,
     name: doc.name,
-    contentSummary: doc.contentSummary,
+    contentSummary: updatedSummaries.get(doc.id) ?? doc.contentSummary,
   }));
 }

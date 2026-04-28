@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { buildScopeParam } from "@/lib/documents";
 
 interface RelatedDoc {
   id: string;
@@ -38,13 +39,7 @@ export default function DocumentLinksBar({
   useEffect(() => {
     if (!isCharacter && !isRelationship) return;
 
-    const scopeParam = storyId
-      ? `storyId=${storyId}`
-      : seriesId
-        ? `seriesId=${seriesId}`
-        : universeId
-          ? `universeId=${universeId}`
-          : null;
+    const scopeParam = buildScopeParam(storyId, seriesId, universeId);
     if (scopeParam === null) return;
 
     const types = isCharacter ? "RELATIONSHIP,CHARACTER" : "CHARACTER";

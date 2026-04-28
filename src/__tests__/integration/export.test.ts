@@ -27,8 +27,8 @@ const mockAuth = auth as jest.Mock;
 const mockDocFindFirst = prisma.document.findFirst as jest.Mock;
 const mockStoryFindFirst = prisma.story.findFirst as jest.Mock;
 
-const PARAMS = { params: { id: "doc-1" } };
-const PROJECT_PARAMS = { params: { id: "story-1" } };
+const PARAMS = { params: Promise.resolve({ id: "doc-1" }) };
+const PROJECT_PARAMS = { params: Promise.resolve({ id: "story-1" }) };
 const authed = { user: { id: "user-1" } };
 
 const tiptapJson = {

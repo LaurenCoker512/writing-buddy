@@ -1,3 +1,5 @@
+import type { AnthropicModel } from "@prisma/client";
+
 /**
  * AI configuration constants.
  *
@@ -65,7 +67,7 @@ export const AI_CONFIG = {
     HAIKU: "claude-haiku-4-5-20251001",
     SONNET: "claude-sonnet-4-6",
     OPUS: "claude-opus-4-7",
-  } as Record<string, string>,
+  } as Record<AnthropicModel, string>,
 
   /** Number of loglines generated per brainstorm batch. */
   BRAINSTORM_LOGLINE_COUNT: 5,

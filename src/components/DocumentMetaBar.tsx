@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { buildScopeParam } from "@/lib/documents";
 import type { DocumentTypeValue } from "@/lib/documents";
 import {
   CHARACTER_ROLES,
@@ -43,13 +44,7 @@ export default function DocumentMetaBar({
 
   useEffect(() => {
     if (documentType !== "RELATIONSHIP") return;
-    const scopeParam = storyId
-      ? `storyId=${storyId}`
-      : seriesId
-        ? `seriesId=${seriesId}`
-        : universeId
-          ? `universeId=${universeId}`
-          : null;
+    const scopeParam = buildScopeParam(storyId, seriesId, universeId);
     if (scopeParam === null) return;
     fetch(`/api/documents?${scopeParam}&types=CHARACTER`)
       .then((res) => (res.ok ? (res.json() as Promise<CharacterOption[]>) : Promise.resolve([])))

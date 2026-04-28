@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import type { RouteParams } from "@/types/route";
 
-type Params = { params: { id: string; messageId: string } };
-
-export async function DELETE(_req: NextRequest, { params }: Params) {
+export async function DELETE(_req: NextRequest, { params }: RouteParams<{ id: string; messageId: string }>) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { id, messageId } = await params;
   const message = await prisma.chatMessage.findFirst({
-    where: { id: params.messageId, documentId: params.id },
+    where: { id: messageId, documentId: id },
     include: {
       document: {
         include: {
@@ -36,7 +36,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  await prisma.chatMessage.delete({ where: { id: params.messageId } });
+  await prisma.chatMessage.delete({ where: { id: messageId } });
 
   return new NextResponse(null, { status: 204 });
 }

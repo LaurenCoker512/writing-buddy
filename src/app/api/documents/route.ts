@@ -20,9 +20,16 @@ export async function GET(req: NextRequest) {
   const typesParam = searchParams.get("types");
   const types = typesParam ? typesParam.split(",").filter(isDocumentType) : undefined;
 
-  if (!storyId && !seriesId && !universeId) {
+  const scopeCount = [storyId, seriesId, universeId].filter(Boolean).length;
+  if (scopeCount === 0) {
     return NextResponse.json(
       { error: "At least one scope parameter is required" },
+      { status: 400 },
+    );
+  }
+  if (scopeCount > 1) {
+    return NextResponse.json(
+      { error: "Only one scope parameter (storyId, seriesId, or universeId) may be provided" },
       { status: 400 },
     );
   }
@@ -41,9 +48,7 @@ export async function GET(req: NextRequest) {
 
   const documents = await prisma.document.findMany({
     where: {
-      ...(storyId ? { storyId } : {}),
-      ...(seriesId && !storyId ? { seriesId } : {}),
-      ...(universeId && !storyId && !seriesId ? { universeId } : {}),
+      ...(storyId ? { storyId } : seriesId ? { seriesId } : { universeId: universeId! }),
       ...(types && types.length > 0 ? { type: { in: types } } : {}),
     },
     select: { id: true, name: true, type: true, meta: true, order: true },
@@ -100,7 +105,7 @@ export async function POST(req: NextRequest) {
     body.tiptapJson !== null &&
     !Array.isArray(body.tiptapJson)
       ? (body.tiptapJson as Prisma.InputJsonValue)
-      : (buildTemplate(body.type) as unknown as Prisma.InputJsonValue);
+      : buildTemplate(body.type);
 
   const meta =
     typeof body.meta === "object" && body.meta !== null && !Array.isArray(body.meta)

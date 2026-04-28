@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { findOwnedDocument } from "@/lib/db-helpers";
+import type { RouteParams } from "@/types/route";
 
 export async function POST(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: RouteParams<{ id: string }>,
 ) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -28,8 +30,7 @@ export async function POST(
     data: {
       name: `${original.name} (AU)`,
       type: original.type,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      tiptapJson: original.tiptapJson as any,
+      tiptapJson: original.tiptapJson as Prisma.InputJsonValue,
       storyId: original.storyId,
       seriesId: original.seriesId,
       universeId: original.universeId,

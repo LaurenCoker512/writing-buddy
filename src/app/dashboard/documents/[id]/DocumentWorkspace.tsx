@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { DOCUMENT_TYPE_LABELS } from "@/lib/documents";
 import type { DocumentTypeValue } from "@/lib/documents";
@@ -71,15 +71,12 @@ export default function DocumentWorkspace({
   const [initialDiffProposals] = useState<DiffProposal[]>(() =>
     consumePrepopulateProposals(documentId),
   );
+  const editorContentRef = useRef<object>(initialJson);
 
   const typeLabel = DOCUMENT_TYPE_LABELS[documentType as DocumentTypeValue] ?? documentType;
 
   async function handleAcceptDiff(proposal: DiffProposal) {
-    const docRes = await fetch(`/api/documents/${documentId}`);
-    if (!docRes.ok) return;
-
-    const doc = (await docRes.json()) as { tiptapJson: object };
-    const currentDoc = doc.tiptapJson as TipTapDoc;
+    const currentDoc = editorContentRef.current as TipTapDoc;
 
     const newNodes = markdownToTipTapNodes(proposal.newMarkdown);
     let newDoc: TipTapDoc;
@@ -257,6 +254,7 @@ export default function DocumentWorkspace({
           saveStatus={saveStatus}
           onSaveStatusChange={setSaveStatus}
           externalContent={externalContent}
+          contentRef={editorContentRef}
         />
       </div>
     </div>

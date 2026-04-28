@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import type { DocumentTypeValue } from "@/lib/documents";
 
 interface TipTapTextNode {
@@ -5,15 +6,25 @@ interface TipTapTextNode {
   text: string;
 }
 
-interface TipTapHeadingNode {
+export interface TipTapHeadingNode {
   type: "heading";
   attrs: { level: number };
+  content: [TipTapTextNode];
+}
+
+export interface TipTapParagraphNode {
+  type: "paragraph";
   content: [TipTapTextNode];
 }
 
 export interface TipTapTemplateDoc {
   type: "doc";
   content: TipTapHeadingNode[];
+}
+
+export interface TipTapPlotDoc {
+  type: "doc";
+  content: (TipTapHeadingNode | TipTapParagraphNode)[];
 }
 
 function heading(text: string): TipTapHeadingNode {
@@ -62,23 +73,13 @@ const TEMPLATE_HEADINGS: Partial<Record<DocumentTypeValue, string[]>> = {
   ],
 };
 
-export function buildTemplate(type: DocumentTypeValue): TipTapTemplateDoc {
+export function buildTemplate(type: DocumentTypeValue): Prisma.InputJsonValue {
   const headings = TEMPLATE_HEADINGS[type];
-  if (!headings) {
-    return { type: "doc", content: [] };
-  }
-  return { type: "doc", content: headings.map(heading) };
+  const doc: TipTapTemplateDoc = { type: "doc", content: headings ? headings.map(heading) : [] };
+  return doc as unknown as Prisma.InputJsonValue;
 }
 
-interface TipTapParagraphNode {
-  type: "paragraph";
-  content: [TipTapTextNode];
-}
-
-export function buildPlotTemplateWithPremise(logline: string): {
-  type: "doc";
-  content: (TipTapHeadingNode | TipTapParagraphNode)[];
-} {
+export function buildPlotTemplateWithPremise(logline: string): Prisma.InputJsonValue {
   const headings = TEMPLATE_HEADINGS["PLOT"] ?? [];
   const content: (TipTapHeadingNode | TipTapParagraphNode)[] = [];
   for (const text of headings) {
@@ -87,5 +88,6 @@ export function buildPlotTemplateWithPremise(logline: string): {
       content.push({ type: "paragraph", content: [{ type: "text", text: logline }] });
     }
   }
-  return { type: "doc", content };
+  const doc: TipTapPlotDoc = { type: "doc", content };
+  return doc as unknown as Prisma.InputJsonValue;
 }

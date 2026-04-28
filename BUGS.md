@@ -54,39 +54,39 @@ Work through these one at a time. Check off each item when resolved.
 
 ## P3 — Moderate
 
-- [ ] **#11 Scope param construction duplicated in `DocumentMetaBar` and `DocumentLinksBar`**
+- [x] **#11 Scope param construction duplicated in `DocumentMetaBar` and `DocumentLinksBar`**
   Both build `storyId ? \`storyId=${storyId}\` : seriesId ? ...` independently.
   **Fix:** Extract `buildScopeParam(storyId, seriesId, universeId): string | null` as a shared utility in `src/lib/documents.ts`.
 
-- [ ] **#12 PATCH body validation for stories/series/universes duplicated 3×**
+- [x] **#12 PATCH body validation for stories/series/universes duplicated 3×**
   Same field validation logic in `stories/[id]/route.ts`, `series/[id]/route.ts`, `universes/[id]/route.ts`.
   **Fix:** Extract `buildHierarchyPatchData(body)` into `src/lib/hierarchy.ts`.
 
-- [ ] **#13 Async params type inconsistency across routes**
+- [x] **#13 Async params type inconsistency across routes**
   Some routes use `{ params: { id: string } }` (sync), others `{ params: Promise<{ id: string }> }` (Next.js 15 async).
   **Fix:** Standardize on the async pattern throughout with a shared `RouteParams<T>` type alias.
 
-- [ ] **#14 `as any` and `as unknown as` casts**
+- [x] **#14 `as any` and `as unknown as` casts**
   - `duplicate/route.ts`: `tiptapJson: original.tiptapJson as any` — fix to `as Prisma.InputJsonValue`
   - `documents/route.ts`: `buildTemplate(...) as unknown as Prisma.InputJsonValue` — add `satisfies Prisma.InputJsonValue` to the template builder's return type.
 
-- [ ] **#15 `content-summary.ts` mutates fetched Prisma objects in-place**
+- [x] **#15 `content-summary.ts` mutates fetched Prisma objects in-place**
   Line 67: `doc.contentSummary = summary` mutates the array returned by `prisma.document.findMany`.
   **Fix:** Build the return array explicitly instead of mutating in place.
 
-- [ ] **#16 `ANTHROPIC_MODEL_IDS` typed as `Record<string, string>`**
+- [x] **#16 `ANTHROPIC_MODEL_IDS` typed as `Record<string, string>`**
   In `src/config/ai.ts`, invalid model key lookups are not caught at compile time.
   **Fix:** Use `Record<"HAIKU" | "SONNET" | "OPUS", string>` (or import the Prisma `AnthropicModel` enum).
 
-- [ ] **#17 `scopeWhere` priority inconsistency in `GET /api/documents`**
+- [x] **#17 `scopeWhere` priority inconsistency in `GET /api/documents`**
   Ownership validation and the Prisma query use different priority for `storyId` vs. `seriesId` when both are provided. A request with both could validate ownership of one scope but query documents in another.
   **Fix:** Reject multi-scope requests explicitly (return 400) or enforce and document a strict priority.
 
-- [ ] **#18 No shared `<Modal>` component**
+- [x] **#18 No shared `<Modal>` component**
   Five modals in `Sidebar.tsx` plus `ContradictionCheckerModal` and `CanonIngestionModal` all re-implement the `fixed inset-0 bg-black/40` backdrop + stop-propagation pattern.
   **Fix:** Extract `src/components/ui/Modal.tsx` with `<Modal title onClose>` handling backdrop, focus trap, and Escape key.
 
-- [ ] **#19 `DocumentWorkspace` re-fetches full document on every diff accept**
+- [x] **#19 `DocumentWorkspace` re-fetches full document on every diff accept**
   `handleAcceptDiff` does a `GET /api/documents/:id` to get current content before applying the change, even though the editor already holds it.
   **Fix:** Expose current editor content via a ref or callback and pass it into `handleAcceptDiff` directly.
 

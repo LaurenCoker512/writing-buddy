@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { findOwnedDocument, createVersionWithCap } from "@/lib/db-helpers";
+import type { RouteParams } from "@/types/route";
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: RouteParams<{ id: string }>,
 ) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -29,7 +30,7 @@ export async function GET(
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: RouteParams<{ id: string }>,
 ) {
   const session = await auth();
   if (!session?.user?.id) {

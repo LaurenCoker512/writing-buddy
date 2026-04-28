@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import type { RouteParams } from "@/types/route";
 
-type Params = { params: { id: string } };
-
-export async function GET(_req: NextRequest, { params }: Params) {
+export async function GET(_req: NextRequest, { params }: RouteParams<{ id: string }>) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { id } = await params;
   const universe = await prisma.universe.findFirst({
-    where: { id: params.id, userId: session.user.id },
+    where: { id, userId: session.user.id },
   });
 
   if (!universe) {
@@ -19,7 +19,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   }
 
   const documents = await prisma.document.findMany({
-    where: { universeId: params.id },
+    where: { universeId: id },
     select: { id: true, name: true, type: true },
     orderBy: [{ type: "asc" }, { name: "asc" }],
   });

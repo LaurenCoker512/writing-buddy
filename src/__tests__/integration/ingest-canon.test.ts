@@ -212,7 +212,7 @@ describe("PATCH /api/documents/[id] — meta.isCanon", () => {
   test("stores meta.isCanon = true and returns it in the response", async () => {
     const res = await documentPatch(
       makeDocumentPatchRequest("doc-1", { meta: { isCanon: true } }),
-      { params: { id: "doc-1" } },
+      { params: Promise.resolve({ id: "doc-1" }) },
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as { meta: { isCanon: boolean } };
@@ -222,7 +222,7 @@ describe("PATCH /api/documents/[id] — meta.isCanon", () => {
   test("PATCH calls update with correct meta payload", async () => {
     await documentPatch(
       makeDocumentPatchRequest("doc-1", { meta: { isCanon: true } }),
-      { params: { id: "doc-1" } },
+      { params: Promise.resolve({ id: "doc-1" }) },
     );
     expect(mockDocumentUpdate).toHaveBeenCalledWith(
       expect.objectContaining({

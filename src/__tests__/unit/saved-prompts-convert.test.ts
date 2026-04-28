@@ -1,28 +1,23 @@
-import { buildPlotTemplateWithPremise } from "@/lib/document-templates";
+import { buildPlotTemplateWithPremise, type TipTapPlotDoc, type TipTapHeadingNode } from "@/lib/document-templates";
 
 describe("buildPlotTemplateWithPremise", () => {
   const logline = "A lone detective uncovers a conspiracy that reaches the highest levels.";
 
   test("returns a doc with PLOT headings", () => {
-    const doc = buildPlotTemplateWithPremise(logline);
+    const doc = buildPlotTemplateWithPremise(logline) as unknown as TipTapPlotDoc;
     expect(doc.type).toBe("doc");
-    const headings = doc.content.filter((n) => n.type === "heading");
+    const headings = doc.content.filter((n) => n.type === "heading") as TipTapHeadingNode[];
     expect(headings.length).toBeGreaterThan(0);
-    const headingTexts = headings.map(
-      (n) => (n as { type: "heading"; content: [{ type: "text"; text: string }] }).content[0].text,
-    );
+    const headingTexts = headings.map((n) => n.content[0].text);
     expect(headingTexts).toContain("Premise");
     expect(headingTexts).toContain("Inciting Incident");
     expect(headingTexts).toContain("Climax");
   });
 
   test("inserts logline as paragraph immediately after Premise heading", () => {
-    const doc = buildPlotTemplateWithPremise(logline);
+    const doc = buildPlotTemplateWithPremise(logline) as unknown as TipTapPlotDoc;
     const premiseIdx = doc.content.findIndex(
-      (n) =>
-        n.type === "heading" &&
-        (n as { type: "heading"; content: [{ type: "text"; text: string }] }).content[0].text ===
-          "Premise",
+      (n) => n.type === "heading" && (n as TipTapHeadingNode).content[0].text === "Premise",
     );
     expect(premiseIdx).toBeGreaterThanOrEqual(0);
 
@@ -34,7 +29,7 @@ describe("buildPlotTemplateWithPremise", () => {
   });
 
   test("does not insert paragraphs after other headings", () => {
-    const doc = buildPlotTemplateWithPremise(logline);
+    const doc = buildPlotTemplateWithPremise(logline) as unknown as TipTapPlotDoc;
     const paragraphCount = doc.content.filter((n) => n.type === "paragraph").length;
     expect(paragraphCount).toBe(1);
   });

@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { findOwnedDocument } from "@/lib/db-helpers";
+import type { RouteParams } from "@/types/route";
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string; versionId: string }> },
+  { params }: RouteParams<{ id: string; versionId: string }>,
 ) {
   const session = await auth();
   if (!session?.user?.id) {

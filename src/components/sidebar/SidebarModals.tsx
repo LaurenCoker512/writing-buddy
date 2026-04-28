@@ -8,6 +8,7 @@ import {
 } from "@/lib/documents";
 import type { NodeType, ProjectTree } from "@/types/project-tree";
 import { useAgeGate } from "@/hooks/useAgeGate";
+import Modal from "@/components/ui/Modal";
 
 function AgeGateModal({
   onConfirm,
@@ -19,43 +20,33 @@ function AgeGateModal({
   confirming: boolean;
 }) {
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40"
-      onClick={(e) => {
-        e.stopPropagation();
-        onClose();
-      }}
+    <Modal
+      title="Age Confirmation Required"
+      onClose={onClose}
+      zIndex="z-[60]"
+      data-testid="age-gate-modal"
     >
-      <div
-        className="w-full max-w-sm rounded-lg border border-border bg-surface p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-        data-testid="age-gate-modal"
-      >
-        <h2 className="mb-2 font-heading text-lg font-semibold text-text-primary">
-          Age Confirmation Required
-        </h2>
-        <p className="mb-6 text-sm text-text-muted">
-          Explicit-rated (E) content is intended for adults only. By continuing,
-          you confirm you are 18 years of age or older.
-        </p>
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            disabled={confirming}
-            className="rounded border border-border px-4 py-2 text-sm text-text-muted hover:bg-background disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={confirming}
-            className="rounded bg-accent px-4 py-2 text-sm text-white hover:bg-accent-hover disabled:opacity-50"
-          >
-            {confirming ? "Confirming…" : "I am 18+, Continue"}
-          </button>
-        </div>
+      <p className="mb-6 text-sm text-text-muted">
+        Explicit-rated (E) content is intended for adults only. By continuing,
+        you confirm you are 18 years of age or older.
+      </p>
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={onClose}
+          disabled={confirming}
+          className="rounded border border-border px-4 py-2 text-sm text-text-muted hover:bg-background disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={onConfirm}
+          disabled={confirming}
+          className="rounded bg-accent px-4 py-2 text-sm text-white hover:bg-accent-hover disabled:opacity-50"
+        >
+          {confirming ? "Confirming…" : "I am 18+, Continue"}
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -112,46 +103,34 @@ export function RenameModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-sm rounded-lg border border-border bg-surface p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="mb-4 font-heading text-lg font-semibold text-text-primary">
-          Rename {modal.type}
-        </h2>
-        <input
-          ref={inputRef}
-          type="text"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") submit();
-            if (e.key === "Escape") onClose();
-          }}
-          className="mb-4 w-full rounded border border-border bg-background px-3 py-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-accent"
-          aria-label="New name"
-        />
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="rounded border border-border px-4 py-2 text-sm text-text-muted hover:bg-background"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={submit}
-            disabled={saving || !value.trim()}
-            className="rounded bg-accent px-4 py-2 text-sm text-white hover:bg-accent-hover disabled:opacity-50"
-          >
-            {saving ? "Saving…" : "Rename"}
-          </button>
-        </div>
+    <Modal title={`Rename ${modal.type}`} onClose={onClose}>
+      <input
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") submit();
+        }}
+        className="mb-4 w-full rounded border border-border bg-background px-3 py-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-accent"
+        aria-label="New name"
+      />
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={onClose}
+          className="rounded border border-border px-4 py-2 text-sm text-text-muted hover:bg-background"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={submit}
+          disabled={saving || !value.trim()}
+          className="rounded bg-accent px-4 py-2 text-sm text-white hover:bg-accent-hover disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Rename"}
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -167,46 +146,35 @@ export function DeleteModal({
   onClose: () => void;
 }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-sm rounded-lg border border-border bg-surface p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="mb-2 font-heading text-lg font-semibold text-text-primary">
-          Delete {modal.type}?
-        </h2>
-        <p className="mb-6 text-sm text-text-muted">
-          {modal.type === "document" ? (
-            <>
-              &ldquo;{modal.name}&rdquo; will be permanently deleted along with
-              its versions and chat history.
-            </>
-          ) : (
-            <>
-              &ldquo;{modal.name}&rdquo; will be permanently deleted. Children
-              (series, stories) will be orphaned, not deleted.
-            </>
-          )}
-        </p>
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="rounded border border-border px-4 py-2 text-sm text-text-muted hover:bg-background"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className="rounded bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700"
-          >
-            Delete
-          </button>
-        </div>
+    <Modal title={`Delete ${modal.type}?`} onClose={onClose}>
+      <p className="mb-6 text-sm text-text-muted">
+        {modal.type === "document" ? (
+          <>
+            &ldquo;{modal.name}&rdquo; will be permanently deleted along with
+            its versions and chat history.
+          </>
+        ) : (
+          <>
+            &ldquo;{modal.name}&rdquo; will be permanently deleted. Children
+            (series, stories) will be orphaned, not deleted.
+          </>
+        )}
+      </p>
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={onClose}
+          className="rounded border border-border px-4 py-2 text-sm text-text-muted hover:bg-background"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={onConfirm}
+          className="rounded bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700"
+        >
+          Delete
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -254,19 +222,7 @@ export function NewProjectModal({
   ];
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-sm rounded-lg border border-border bg-surface p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-        data-testid="new-project-modal"
-      >
-        <h2 className="mb-4 font-heading text-lg font-semibold text-text-primary">
-          New Project
-        </h2>
-
+    <Modal title="New Project" onClose={onClose} data-testid="new-project-modal">
         {/* Type */}
         <fieldset className="mb-4">
           <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-text-muted">
@@ -300,7 +256,6 @@ export function NewProjectModal({
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") submit();
-              if (e.key === "Escape") onClose();
             }}
             autoFocus
             className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-accent"
@@ -438,8 +393,7 @@ export function NewProjectModal({
             {saving ? "Creating…" : "Create"}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -480,19 +434,11 @@ export function NewDocumentModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-sm rounded-lg border border-border bg-surface p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-        data-testid="new-document-modal"
-      >
-        <h2 className="mb-1 font-heading text-lg font-semibold text-text-primary">
-          New Document
-        </h2>
-        <p className="mb-4 text-xs text-text-muted">In: {parentName}</p>
+    <Modal onClose={onClose} data-testid="new-document-modal">
+      <h2 className="mb-1 font-heading text-lg font-semibold text-text-primary">
+        New Document
+      </h2>
+      <p className="mb-4 text-xs text-text-muted">In: {parentName}</p>
 
         <fieldset className="mb-4">
           <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-text-muted">
@@ -525,7 +471,6 @@ export function NewDocumentModal({
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") submit();
-              if (e.key === "Escape") onClose();
             }}
             autoFocus
             className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-accent"
@@ -568,7 +513,6 @@ export function NewDocumentModal({
             {saving ? "Creating…" : "Create"}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

@@ -32,7 +32,7 @@ const mockUpdate = prisma.universe.update as jest.Mock;
 const mockDelete = prisma.universe.delete as jest.Mock;
 
 const authed = { user: { id: "user-1" } };
-const PARAMS = { params: { id: "universe-1" } };
+const PARAMS = { params: Promise.resolve({ id: "universe-1" }) };
 
 function makeRequest(body?: unknown): NextRequest {
   return new NextRequest("http://localhost/api/universes", {

@@ -31,7 +31,7 @@ const mockCreate = prisma.story.create as jest.Mock;
 const mockDelete = prisma.story.delete as jest.Mock;
 
 const authed = { user: { id: "user-1" } };
-const PARAMS = { params: { id: "story-1" } };
+const PARAMS = { params: Promise.resolve({ id: "story-1" }) };
 
 function makeRequest(body?: unknown): NextRequest {
   return new NextRequest("http://localhost/api/stories", {

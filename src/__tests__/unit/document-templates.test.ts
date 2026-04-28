@@ -1,8 +1,8 @@
-import { buildTemplate } from "@/lib/document-templates";
+import { buildTemplate, type TipTapTemplateDoc } from "@/lib/document-templates";
 
 describe("buildTemplate", () => {
   test("CHARACTER returns TipTap JSON with all 11 suggested headings", () => {
-    const doc = buildTemplate("CHARACTER");
+    const doc = buildTemplate("CHARACTER") as unknown as TipTapTemplateDoc;
     expect(doc.type).toBe("doc");
     expect(doc.content).toHaveLength(11);
     expect(doc.content[0]).toMatchObject({
@@ -16,7 +16,7 @@ describe("buildTemplate", () => {
   });
 
   test("RELATIONSHIP returns TipTap JSON with all 5 suggested headings", () => {
-    const doc = buildTemplate("RELATIONSHIP");
+    const doc = buildTemplate("RELATIONSHIP") as unknown as TipTapTemplateDoc;
     expect(doc.content).toHaveLength(5);
     const texts = doc.content.map((node) => node.content[0].text);
     expect(texts[0]).toBe("Characters Involved");
@@ -25,7 +25,7 @@ describe("buildTemplate", () => {
   });
 
   test("PLOT returns TipTap JSON with all 7 suggested headings", () => {
-    const doc = buildTemplate("PLOT");
+    const doc = buildTemplate("PLOT") as unknown as TipTapTemplateDoc;
     expect(doc.content).toHaveLength(7);
     const texts = doc.content.map((node) => node.content[0].text);
     expect(texts[0]).toBe("Premise");
@@ -34,7 +34,7 @@ describe("buildTemplate", () => {
   });
 
   test("SCENE returns TipTap JSON with all 8 suggested headings", () => {
-    const doc = buildTemplate("SCENE");
+    const doc = buildTemplate("SCENE") as unknown as TipTapTemplateDoc;
     expect(doc.content).toHaveLength(8);
     const texts = doc.content.map((node) => node.content[0].text);
     expect(texts[0]).toBe("POV Character");
@@ -43,18 +43,18 @@ describe("buildTemplate", () => {
   });
 
   test("WORLDBUILDING returns empty doc (no suggested headings)", () => {
-    const doc = buildTemplate("WORLDBUILDING");
+    const doc = buildTemplate("WORLDBUILDING") as unknown as TipTapTemplateDoc;
     expect(doc.type).toBe("doc");
     expect(doc.content).toHaveLength(0);
   });
 
   test("OTHER returns empty doc", () => {
-    const doc = buildTemplate("OTHER");
+    const doc = buildTemplate("OTHER") as unknown as TipTapTemplateDoc;
     expect(doc.content).toHaveLength(0);
   });
 
   test("all heading nodes have level 2", () => {
-    const charDoc = buildTemplate("CHARACTER");
+    const charDoc = buildTemplate("CHARACTER") as unknown as TipTapTemplateDoc;
     charDoc.content.forEach((node) => {
       expect(node.attrs.level).toBe(2);
     });

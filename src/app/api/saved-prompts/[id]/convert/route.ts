@@ -5,10 +5,11 @@ import { Prisma } from "@prisma/client";
 import { isRating } from "@/lib/hierarchy";
 import { buildPlotTemplateWithPremise } from "@/lib/document-templates";
 import { AI_CONFIG } from "@/config/ai";
+import type { RouteParams } from "@/types/route";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: RouteParams<{ id: string }>,
 ) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -54,7 +55,7 @@ export async function POST(
     data: {
       type: "PLOT",
       name: "Plot",
-      tiptapJson: buildPlotTemplateWithPremise(savedPrompt.content) as unknown as Prisma.InputJsonValue,
+      tiptapJson: buildPlotTemplateWithPremise(savedPrompt.content),
       storyId: story.id,
     },
   });

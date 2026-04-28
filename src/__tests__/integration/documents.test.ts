@@ -36,7 +36,7 @@ const mockDocDelete = prisma.document.delete as jest.Mock;
 const mockStoryFindFirst = prisma.story.findFirst as jest.Mock;
 
 const authed = { user: { id: "user-1" } };
-const PARAMS = { params: { id: "doc-1" } };
+const PARAMS = { params: Promise.resolve({ id: "doc-1" }) };
 
 function makeRequest(body?: unknown, method = "POST"): NextRequest {
   return new NextRequest("http://localhost/api/documents", {

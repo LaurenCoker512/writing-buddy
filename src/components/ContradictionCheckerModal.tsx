@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Modal from "@/components/ui/Modal";
 import type { ContradictionIssue } from "@/app/api/ai/contradiction-check/route";
 
 type Phase = "estimating" | "confirming" | "checking" | "results" | "error";
@@ -71,21 +72,13 @@ export default function ContradictionCheckerModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-lg rounded-lg border border-border bg-surface p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-        data-testid="contradiction-checker-modal"
-      >
-        <h2 className="mb-1 font-heading text-lg font-semibold text-text-primary">
-          Contradiction Checker
-        </h2>
-        {storyName !== undefined && storyName !== "" && (
-          <p className="mb-3 text-sm text-text-muted">{storyName}</p>
-        )}
+    <Modal maxWidth="lg" onClose={onClose} data-testid="contradiction-checker-modal">
+      <h2 className="mb-1 font-heading text-lg font-semibold text-text-primary">
+        Contradiction Checker
+      </h2>
+      {storyName !== undefined && storyName !== "" && (
+        <p className="mb-3 text-sm text-text-muted">{storyName}</p>
+      )}
 
         {phase === "estimating" && (
           <p className="text-sm text-text-muted" data-testid="contradiction-estimating">
@@ -204,7 +197,6 @@ export default function ContradictionCheckerModal({
             </div>
           </>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }
