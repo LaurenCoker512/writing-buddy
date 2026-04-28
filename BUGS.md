@@ -94,22 +94,22 @@ Work through these one at a time. Check off each item when resolved.
 
 ## P4 — Minor / Cleanup
 
-- [ ] **#20 Safe-filename sanitization copy-pasted 3×**
+- [x] **#20 Safe-filename sanitization copy-pasted 3×**
   The same `.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-")` expression appears in three export routes.
   **Fix:** Extract `toSafeFilename(name: string): string` into `src/lib/export.ts`.
 
-- [ ] **#21 Inline SVG icons defined locally in multiple components**
+- [x] **#21 Inline SVG icons defined locally in multiple components**
   12 icons in `Sidebar.tsx`, `HamburgerIcon` in `DashboardShell.tsx`, `TrashIcon` in `ChatPanel.tsx`.
   **Fix:** Move all to `src/components/icons/` with a barrel export.
 
-- [ ] **#22 `session.ts` is dead code with a wrong guard**
+- [x] **#22 `session.ts` is dead code with a wrong guard**
   `src/lib/session.ts` is never imported anywhere. Its `isValidSession` guard checks `email` instead of `id`, which is inconsistent with how every route gates access.
   **Fix:** Delete the file.
 
-- [ ] **#23 `fetchTree()` called without `void` in async handlers**
+- [x] **#23 `fetchTree()` called without `void` in async handlers**
   In `Sidebar.tsx`, `fetchTree()` is fire-and-forget inside async functions but is not prefixed with `void`.
   **Fix:** Add `void fetchTree()` for explicitness, matching the pattern used elsewhere in the codebase.
 
-- [ ] **#24 `RenameModal` `saving` state is effectively dead**
+- [x] **#24 `RenameModal` `saving` state is effectively dead**
   `setSaving(true)` is called but the modal closes before `saving` ever returns to `false`, making the state useless.
   **Fix:** Remove the `saving` state from `RenameModal`, or make `submit` async and await `onConfirm`.

@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { tiptapToMarkdown } from "@/lib/tiptap-to-markdown";
 import type { TipTapNode } from "@/lib/tiptap-to-markdown";
 import { findOwnedDocument } from "@/lib/db-helpers";
+import { toSafeFilename } from "@/lib/export";
 import type { RouteParams } from "@/types/route";
 import React from "react";
 import {
@@ -74,7 +75,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams<{ id: strin
   });
 
   const buffer = await renderToBuffer(pdfComponent);
-  const filename = `${document.name.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-")}.pdf`;
+  const filename = `${toSafeFilename(document.name)}.pdf`;
 
   return new NextResponse(new Uint8Array(buffer), {
     headers: {

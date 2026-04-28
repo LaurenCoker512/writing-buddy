@@ -81,7 +81,7 @@ export function RenameModal({
   onClose,
 }: {
   modal: ModalState;
-  onConfirm: (name: string) => void;
+  onConfirm: (name: string) => Promise<void>;
   onClose: () => void;
 }) {
   const [value, setValue] = useState(modal.name);
@@ -92,14 +92,18 @@ export function RenameModal({
     inputRef.current?.select();
   }, []);
 
-  const submit = () => {
+  const submit = async () => {
     const trimmed = value.trim();
     if (!trimmed || trimmed === modal.name) {
       onClose();
       return;
     }
     setSaving(true);
-    onConfirm(trimmed);
+    try {
+      await onConfirm(trimmed);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -110,7 +114,7 @@ export function RenameModal({
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter") submit();
+          if (e.key === "Enter") void submit();
         }}
         className="mb-4 w-full rounded border border-border bg-background px-3 py-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-accent"
         aria-label="New name"
@@ -123,7 +127,7 @@ export function RenameModal({
           Cancel
         </button>
         <button
-          onClick={submit}
+          onClick={() => void submit()}
           disabled={saving || !value.trim()}
           className="rounded bg-accent px-4 py-2 text-sm text-white hover:bg-accent-hover disabled:opacity-50"
         >

@@ -3,25 +3,11 @@
 import { useState } from "react";
 import { signOut } from "next-auth/react";
 import Sidebar from "./Sidebar";
+import { HamburgerIcon } from "./icons";
 
 interface DashboardShellProps {
   children: React.ReactNode;
   displayName: string;
-}
-
-function HamburgerIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      className="h-5 w-5"
-      aria-hidden="true"
-    >
-      <path d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
-  );
 }
 
 export default function DashboardShell({
@@ -46,7 +32,7 @@ export default function DashboardShell({
             aria-label="Open sidebar"
             data-testid="hamburger-btn"
           >
-            <HamburgerIcon />
+            <HamburgerIcon className="h-5 w-5" />
           </button>
 
           {/* Show app name on mobile (no sidebar) */}

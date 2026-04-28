@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { tiptapToMarkdown } from "@/lib/tiptap-to-markdown";
 import type { TipTapNode } from "@/lib/tiptap-to-markdown";
 import { findOwnedDocument } from "@/lib/db-helpers";
+import { toSafeFilename } from "@/lib/export";
 import type { RouteParams } from "@/types/route";
 
 export async function GET(_req: NextRequest, { params }: RouteParams<{ id: string }>) {
@@ -16,7 +17,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams<{ id: strin
   if (!document) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const markdown = tiptapToMarkdown(document.tiptapJson as TipTapNode);
-  const filename = `${document.name.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-")}.md`;
+  const filename = `${toSafeFilename(document.name)}.md`;
 
   return new NextResponse(markdown, {
     headers: {

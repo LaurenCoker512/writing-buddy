@@ -11,6 +11,7 @@ import TableHeader from "@tiptap/extension-table-header";
 import { createAutosave, type PatchFn } from "@/lib/autosave";
 import { tiptapToMarkdown } from "@/lib/tiptap-to-markdown";
 import type { TipTapNode } from "@/lib/tiptap-to-markdown";
+import { toSafeFilename } from "@/lib/export";
 
 // ── Toolbar ───────────────────────────────────────────────────────────────────
 
@@ -87,7 +88,7 @@ function Toolbar({
   const getMarkdown = () => tiptapToMarkdown(editor.getJSON() as TipTapNode);
 
   const handleDownloadMarkdown = () => {
-    const safeFilename = `${documentName.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-")}.md`;
+    const safeFilename = `${toSafeFilename(documentName)}.md`;
     downloadBlob(getMarkdown(), safeFilename, "text/markdown");
   };
 

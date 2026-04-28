@@ -5,6 +5,7 @@ import { tiptapToMarkdown } from "@/lib/tiptap-to-markdown";
 import type { TipTapNode } from "@/lib/tiptap-to-markdown";
 import { DOCUMENT_SECTION_LABELS } from "@/lib/documents";
 import type { DocumentTypeValue } from "@/lib/documents";
+import { toSafeFilename } from "@/lib/export";
 import JSZip from "jszip";
 import type { RouteParams } from "@/types/route";
 
@@ -27,7 +28,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams<{ id: strin
   if (!story) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const zip = new JSZip();
-  const safeStoryName = story.name.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-");
+  const safeStoryName = toSafeFilename(story.name);
   const root = zip.folder(safeStoryName)!;
 
   const readme = [
@@ -42,7 +43,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams<{ id: strin
     const section = DOCUMENT_SECTION_LABELS[doc.type as DocumentTypeValue] ?? doc.type;
     const folder = root.folder(section)!;
     const markdown = tiptapToMarkdown(doc.tiptapJson as TipTapNode);
-    const safeDocName = doc.name.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-");
+    const safeDocName = toSafeFilename(doc.name);
     folder.file(`${safeDocName}.md`, `# ${doc.name}\n\n${markdown}`);
   }
 

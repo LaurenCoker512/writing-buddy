@@ -5,6 +5,7 @@ import Link from "next/link";
 import DiffCard from "@/components/DiffCard";
 import type { DiffProposal } from "@/types/diff";
 import { parseInlineBadges } from "@/lib/canon-badge";
+import { TrashIcon } from "@/components/icons";
 
 type ChatMessage = { kind: "message"; key: string; id?: string; role: "user" | "assistant"; content: string };
 type DiffItem = { kind: "diff"; key: string; proposal: DiffProposal };
@@ -14,21 +15,6 @@ interface ChatPanelProps {
   documentId: string;
   onAcceptDiff: (proposal: DiffProposal) => Promise<void>;
   initialDiffProposals?: DiffProposal[];
-}
-
-function TrashIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M2.5 4h11M5.5 4V2.5h5V4M6.5 7v5M9.5 7v5M3.5 4l.8 9.5h7.4l.8-9.5" />
-    </svg>
-  );
 }
 
 function AssistantMessageContent({ content }: { content: string }) {
