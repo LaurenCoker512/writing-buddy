@@ -43,7 +43,7 @@ export default function DashboardShell({
           <div className="flex items-center gap-3">
             <span className="text-sm text-text-muted">{displayName}</span>
             <button
-              onClick={() => signOut({ callbackUrl: "/" })}
+              onClick={() => signOut({ callbackUrl: "/signin" })}
               className="rounded border border-border px-3 py-1 text-sm text-text-muted transition-colors hover:bg-background"
             >
               Sign out

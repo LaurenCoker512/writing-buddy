@@ -15,7 +15,7 @@ export default function DeleteAccountButton() {
     const response = await fetch("/api/account", { method: "DELETE" });
 
     if (response.ok) {
-      await signOut({ callbackUrl: "/" });
+      await signOut({ callbackUrl: "/signin" });
     } else {
       setError("Failed to delete account. Please try again.");
       setDeleting(false);

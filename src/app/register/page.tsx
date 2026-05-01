@@ -9,11 +9,31 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    const newEmailError =
+      email.trim() === ""
+        ? "Email is required."
+        : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+          ? "Enter a valid email address."
+          : null;
+    const newPasswordError =
+      password === ""
+        ? "Password is required."
+        : password.length < 8
+          ? "Password must be at least 8 characters."
+          : null;
+
+    setEmailError(newEmailError);
+    setPasswordError(newPasswordError);
+    if (newEmailError !== null || newPasswordError !== null) return;
+
     setLoading(true);
 
     const res = await fetch("/api/auth/register", {
@@ -24,7 +44,11 @@ export default function RegisterPage() {
 
     if (!res.ok) {
       const data = (await res.json()) as { error?: string };
-      setError(data.error ?? "Registration failed.");
+      if (res.status === 409) {
+        setEmailError(data.error ?? "Email already in use.");
+      } else {
+        setError(data.error ?? "Registration failed.");
+      }
       setLoading(false);
       return;
     }
@@ -70,9 +94,18 @@ export default function RegisterPage() {
               autoComplete="email"
               required
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setEmailError(null);
+              }}
+              aria-describedby={emailError !== null ? "email-error" : undefined}
               className="w-full rounded border border-border bg-surface px-3 py-2 text-text-primary focus:outline-none focus:ring-2 focus:ring-accent"
             />
+            {emailError !== null && (
+              <p id="email-error" role="alert" className="text-xs text-red-600">
+                {emailError}
+              </p>
+            )}
           </div>
 
           <div className="space-y-1">
@@ -89,10 +122,22 @@ export default function RegisterPage() {
               required
               minLength={8}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setPasswordError(null);
+              }}
+              aria-describedby="password-hint"
               className="w-full rounded border border-border bg-surface px-3 py-2 text-text-primary focus:outline-none focus:ring-2 focus:ring-accent"
             />
-            <p className="text-xs text-text-muted">At least 8 characters.</p>
+            {passwordError !== null ? (
+              <p id="password-hint" role="alert" className="text-xs text-red-600">
+                {passwordError}
+              </p>
+            ) : (
+              <p id="password-hint" className="text-xs text-text-muted">
+                At least 8 characters.
+              </p>
+            )}
           </div>
 
           {error !== null && (

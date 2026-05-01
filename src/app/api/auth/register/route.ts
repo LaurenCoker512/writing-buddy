@@ -18,6 +18,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return NextResponse.json(
+      { error: "Enter a valid email address." },
+      { status: 400 }
+    );
+  }
+
   if (password.length < 8) {
     return NextResponse.json(
       { error: "Password must be at least 8 characters" },
