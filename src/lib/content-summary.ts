@@ -51,7 +51,7 @@ export async function ensureContentSummariesFresh(
     },
   });
 
-  const stale = documents.filter(isStale);
+  const stale = documents.filter((doc) => doc.type !== "BRAINSTORM" && isStale(doc));
   const updatedSummaries = new Map<string, string>();
 
   await Promise.all(

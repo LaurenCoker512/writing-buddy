@@ -3,13 +3,20 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import DiffCard from "@/components/DiffCard";
+import AnalysisCard from "@/components/AnalysisCard";
 import type { DiffProposal } from "@/types/diff";
+import type { AnalysisSection } from "@/types/analysis";
 import { parseInlineBadges } from "@/lib/canon-badge";
 import { TrashIcon } from "@/components/icons";
 
+type PanelMode = "chat" | "edit" | "analyze";
+
 type ChatMessage = { kind: "message"; key: string; id?: string; role: "user" | "assistant"; content: string };
 type DiffItem = { kind: "diff"; key: string; proposal: DiffProposal };
-type ChatItem = ChatMessage | DiffItem;
+type AnalysisItem = { kind: "analysis"; key: string; sections: AnalysisSection[] };
+type ChatItem = ChatMessage | DiffItem | AnalysisItem;
+
+const ANALYZE_PREVIEW_LENGTH = 200;
 
 interface ChatPanelProps {
   documentId: string;
@@ -55,7 +62,8 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [isRequestingDiff, setIsRequestingDiff] = useState(false);
-  const [editMode, setEditMode] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [mode, setMode] = useState<PanelMode>("chat");
   const [noApiKey, setNoApiKey] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const keyCounter = useRef(0);
@@ -259,6 +267,86 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
     }
   }
 
+  async function requestAnalysis() {
+    const content = input.trim();
+    if (!content || isStreaming || isRequestingDiff || isAnalyzing) return;
+
+    setInput("");
+    setIsAnalyzing(true);
+    setNoApiKey(false);
+
+    const preview =
+      content.length > ANALYZE_PREVIEW_LENGTH
+        ? `${content.slice(0, ANALYZE_PREVIEW_LENGTH)}… [+${content.length - ANALYZE_PREVIEW_LENGTH} chars]`
+        : content;
+
+    const userKey = nextKey();
+    setItems((prev) => [
+      ...prev,
+      { kind: "message", key: userKey, role: "user", content: `[Analyze] ${preview}` },
+    ]);
+
+    try {
+      const response = await fetch("/api/ai/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documentId, content }),
+      });
+
+      if (response.status === 402) {
+        setNoApiKey(true);
+        setItems((prev) => prev.filter((item) => item.key !== userKey));
+        return;
+      }
+
+      if (!response.ok) {
+        setItems((prev) => [
+          ...prev,
+          {
+            kind: "message",
+            key: nextKey(),
+            role: "assistant",
+            content: "Could not analyze content. Please try again.",
+          },
+        ]);
+        return;
+      }
+
+      const data = (await response.json()) as { sections?: AnalysisSection[] };
+      const sections = data.sections ?? [];
+
+      if (sections.length === 0) {
+        setItems((prev) => [
+          ...prev,
+          {
+            kind: "message",
+            key: nextKey(),
+            role: "assistant",
+            content: "No relevant details were found for this document. Try a different excerpt.",
+          },
+        ]);
+        return;
+      }
+
+      setItems((prev) => [
+        ...prev,
+        { kind: "analysis", key: nextKey(), sections },
+      ]);
+    } catch {
+      setItems((prev) => [
+        ...prev,
+        {
+          kind: "message",
+          key: nextKey(),
+          role: "assistant",
+          content: "Something went wrong. Please try again.",
+        },
+      ]);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }
+
   async function handleAccept(proposal: DiffProposal) {
     setItems((prev) => prev.filter((item) => !(item.kind === "diff" && item.proposal.id === proposal.id)));
     await onAcceptDiff(proposal);
@@ -273,7 +361,7 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
     setItems((prev) => prev.filter((item) => item.key !== itemKey));
   }
 
-  const isBusy = isStreaming || isRequestingDiff;
+  const isBusy = isStreaming || isRequestingDiff || isAnalyzing;
 
   return (
     <div className="flex h-full flex-col">
@@ -284,24 +372,18 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
             AI Chat
           </h2>
           <div className="flex rounded-lg border border-border text-xs font-medium overflow-hidden">
-            <button
-              onClick={() => setEditMode(false)}
-              className={`px-3 py-1.5 transition-colors ${
-                !editMode ? "bg-accent text-white" : "text-text-muted hover:text-text-primary"
-              }`}
-              aria-pressed={!editMode}
-            >
-              Chat
-            </button>
-            <button
-              onClick={() => setEditMode(true)}
-              className={`px-3 py-1.5 transition-colors ${
-                editMode ? "bg-accent text-white" : "text-text-muted hover:text-text-primary"
-              }`}
-              aria-pressed={editMode}
-            >
-              Edit
-            </button>
+            {(["chat", "edit", "analyze"] as PanelMode[]).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={`px-3 py-1.5 capitalize transition-colors ${
+                  mode === m ? "bg-accent text-white" : "text-text-muted hover:text-text-primary"
+                }`}
+                aria-pressed={mode === m}
+              >
+                {m}
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -313,9 +395,11 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
 
         {!isLoadingHistory && items.length === 0 && !noApiKey && (
           <p className="py-8 text-center text-sm text-text-muted">
-            {editMode
+            {mode === "edit"
               ? "Describe the edits you want to make to your document."
-              : "Ask me anything about your document."}
+              : mode === "analyze"
+                ? "Paste a scene, transcript, or summary to extract details for this document."
+                : "Ask me anything about your document."}
           </p>
         )}
 
@@ -340,6 +424,10 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
               </p>
             )}
             {items.map((item, index) => {
+              if (item.kind === "analysis") {
+                return <AnalysisCard key={item.key} sections={item.sections} />;
+              }
+
               if (item.kind === "diff") {
                 return (
                   <DiffCard
@@ -400,29 +488,49 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
           <textarea
             className="flex-1 resize-none rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent"
             placeholder={
-              editMode
+              mode === "edit"
                 ? "Describe the edits you want…"
-                : "Ask anything about your document…"
+                : mode === "analyze"
+                  ? "Paste a scene, transcript, or summary to analyze…"
+                  : "Ask anything about your document…"
             }
-            rows={2}
+            rows={mode === "analyze" ? 4 : 2}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
+              if (e.key === "Enter" && !e.shiftKey && mode !== "analyze") {
                 e.preventDefault();
-                void (editMode ? requestEdit() : sendMessage());
+                void (mode === "edit" ? requestEdit() : sendMessage());
               }
             }}
             disabled={isBusy}
-            aria-label={editMode ? "Edit instruction input" : "Chat message input"}
+            aria-label={
+              mode === "edit"
+                ? "Edit instruction input"
+                : mode === "analyze"
+                  ? "Content to analyze"
+                  : "Chat message input"
+            }
           />
           <button
-            onClick={() => void (editMode ? requestEdit() : sendMessage())}
+            onClick={() =>
+              void (mode === "edit"
+                ? requestEdit()
+                : mode === "analyze"
+                  ? requestAnalysis()
+                  : sendMessage())
+            }
             disabled={isBusy || !input.trim()}
             className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label={editMode ? "Request edit" : "Send message"}
+            aria-label={
+              mode === "edit"
+                ? "Request edit"
+                : mode === "analyze"
+                  ? "Analyze content"
+                  : "Send message"
+            }
           >
-            {editMode ? "Edit" : "Send"}
+            {mode === "edit" ? "Edit" : mode === "analyze" ? "Analyze" : "Send"}
           </button>
         </div>
       </div>

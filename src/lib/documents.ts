@@ -1,4 +1,5 @@
 export type DocumentTypeValue =
+  | "BRAINSTORM"
   | "CHARACTER"
   | "RELATIONSHIP"
   | "WORLDBUILDING"
@@ -8,6 +9,7 @@ export type DocumentTypeValue =
 
 export function isDocumentType(value: unknown): value is DocumentTypeValue {
   return (
+    value === "BRAINSTORM" ||
     value === "CHARACTER" ||
     value === "RELATIONSHIP" ||
     value === "WORLDBUILDING" ||
@@ -37,6 +39,7 @@ export function isValidDocumentScope(
 }
 
 export const DOCUMENT_SECTION_LABELS: Record<DocumentTypeValue, string> = {
+  BRAINSTORM: "Brainstorm",
   CHARACTER: "Characters",
   RELATIONSHIP: "Relationships",
   WORLDBUILDING: "Worldbuilding",
@@ -46,6 +49,7 @@ export const DOCUMENT_SECTION_LABELS: Record<DocumentTypeValue, string> = {
 };
 
 export const DOCUMENT_TYPE_LABELS: Record<DocumentTypeValue, string> = {
+  BRAINSTORM: "Brainstorm",
   CHARACTER: "Character",
   RELATIONSHIP: "Relationship",
   WORLDBUILDING: "Worldbuilding",
@@ -55,6 +59,7 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentTypeValue, string> = {
 };
 
 export const DOCUMENT_TYPE_ORDER: DocumentTypeValue[] = [
+  "BRAINSTORM",
   "CHARACTER",
   "RELATIONSHIP",
   "WORLDBUILDING",

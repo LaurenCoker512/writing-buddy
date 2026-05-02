@@ -20,6 +20,7 @@ enum Mode {
 }
 
 enum DocumentType {
+  BRAINSTORM
   CHARACTER
   RELATIONSHIP
   WORLDBUILDING

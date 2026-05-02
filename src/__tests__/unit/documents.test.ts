@@ -8,6 +8,7 @@ import {
 
 describe("isDocumentType", () => {
   test("accepts all valid document types", () => {
+    expect(isDocumentType("BRAINSTORM")).toBe(true);
     expect(isDocumentType("CHARACTER")).toBe(true);
     expect(isDocumentType("RELATIONSHIP")).toBe(true);
     expect(isDocumentType("WORLDBUILDING")).toBe(true);
@@ -49,8 +50,9 @@ describe("isValidDocumentScope", () => {
 });
 
 describe("document type metadata", () => {
-  test("DOCUMENT_TYPE_ORDER contains all six types", () => {
-    expect(DOCUMENT_TYPE_ORDER).toHaveLength(6);
+  test("DOCUMENT_TYPE_ORDER contains all seven types", () => {
+    expect(DOCUMENT_TYPE_ORDER).toHaveLength(7);
+    expect(DOCUMENT_TYPE_ORDER).toContain("BRAINSTORM");
     expect(DOCUMENT_TYPE_ORDER).toContain("CHARACTER");
     expect(DOCUMENT_TYPE_ORDER).toContain("RELATIONSHIP");
     expect(DOCUMENT_TYPE_ORDER).toContain("WORLDBUILDING");

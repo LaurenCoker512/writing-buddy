@@ -98,14 +98,22 @@ export function buildSystemPrompt(
   tier2Context?: string | null,
   canonContext?: string | null,
   explicitEnabled?: boolean,
+  documentType?: string,
 ): string {
   const modeLabel = mode === "FANFIC" ? "fanfiction" : "original fiction";
   const ratingDesc = RATING_DESCRIPTIONS[rating] ?? "general";
 
-  const parts = [
-    `You are a writing assistant helping with a ${modeLabel} story (rated ${rating} — ${ratingDesc}).`,
-    "Your role is to help the writer develop characters, plot, worldbuilding, and prose. Be creative, collaborative, and responsive to the writer's vision.",
-  ];
+  const isBrainstorm = documentType === "BRAINSTORM";
+
+  const parts = isBrainstorm
+    ? [
+        `You are a creative thinking partner helping with a ${modeLabel} story (rated ${rating} — ${ratingDesc}).`,
+        "This is a brainstorm document — a free-form space for raw ideas, half-formed thoughts, and open questions. Your role is to help the writer think expansively: generate possibilities, ask probing questions, make unexpected connections, and explore directions without judgment. Embrace ambiguity. Encourage quantity over polish. React with curiosity and enthusiasm to any idea, no matter how rough.",
+      ]
+    : [
+        `You are a writing assistant helping with a ${modeLabel} story (rated ${rating} — ${ratingDesc}).`,
+        "Your role is to help the writer develop characters, plot, worldbuilding, and prose. Be creative, collaborative, and responsive to the writer's vision.",
+      ];
 
   const contentRestriction =
     rating === "E" && explicitEnabled === true ? null : (CONTENT_RESTRICTIONS[rating] ?? null);

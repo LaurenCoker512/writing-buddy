@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { isRating } from "@/lib/hierarchy";
-import { buildPlotTemplateWithPremise } from "@/lib/document-templates";
+import { buildBrainstormTemplateWithPrompt } from "@/lib/document-templates";
 import { AI_CONFIG } from "@/config/ai";
 import type { RouteParams } from "@/types/route";
 
@@ -51,11 +51,11 @@ export async function POST(
     },
   });
 
-  const plotDoc = await prisma.document.create({
+  const brainstormDoc = await prisma.document.create({
     data: {
-      type: "PLOT",
-      name: "Plot",
-      tiptapJson: buildPlotTemplateWithPremise(savedPrompt.content),
+      type: "BRAINSTORM",
+      name: "Brainstorm",
+      tiptapJson: buildBrainstormTemplateWithPrompt(savedPrompt.content),
       storyId: story.id,
     },
   });
@@ -65,5 +65,5 @@ export async function POST(
     data: { convertedToStoryId: story.id },
   });
 
-  return NextResponse.json({ ...story, plotDocumentId: plotDoc.id }, { status: 201 });
+  return NextResponse.json({ ...story, brainstormDocumentId: brainstormDoc.id }, { status: 201 });
 }

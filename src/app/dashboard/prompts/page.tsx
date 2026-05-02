@@ -508,9 +508,9 @@ export default function PromptsPage() {
       body: JSON.stringify(data),
     });
     if (res.ok) {
-      const result = (await res.json()) as { id: string; plotDocumentId: string };
+      const result = (await res.json()) as { id: string; brainstormDocumentId: string };
       setConvertTarget(null);
-      router.push(`/dashboard/documents/${result.plotDocumentId}`);
+      router.push(`/dashboard/documents/${result.brainstormDocumentId}`);
     }
   };
 

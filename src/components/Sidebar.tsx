@@ -507,7 +507,11 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           aria-label={doc.name}
           aria-current={isActive ? "page" : undefined}
         >
-          <FileIcon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
+          {doc.type === "BRAINSTORM" ? (
+            <BrainstormIcon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
+          ) : (
+            <FileIcon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
+          )}
           {!collapsed && <span className="truncate">{doc.name}</span>}
           {!collapsed && doc.meta?.isCanon === true && (
             <span
@@ -565,16 +569,20 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       const sectionKey = `${parentId}-${type}`;
       const isSectionCollapsed = collapsedSections.has(sectionKey);
 
+      const isBrainstormSection = type === "BRAINSTORM";
       const sectionLabel = (
         <li key={`section-${type}`}>
           <button
             onClick={() => toggleSection(sectionKey)}
-            className="flex w-full items-center gap-1 pb-0.5 pt-2 text-xs font-medium uppercase tracking-wide text-text-muted hover:text-text-primary"
+            className={`flex w-full items-center gap-1 pb-0.5 pt-2 text-xs font-medium uppercase tracking-wide hover:text-text-primary ${isBrainstormSection ? "text-accent/70" : "text-text-muted"}`}
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
             aria-expanded={!isSectionCollapsed}
           >
             {!collapsed && <ChevronIcon expanded={!isSectionCollapsed} className="h-2.5 w-2.5 shrink-0" />}
-            {DOCUMENT_SECTION_LABELS[type]}
+            {!collapsed && isBrainstormSection && (
+              <BrainstormIcon className="h-3 w-3 shrink-0" />
+            )}
+            {!collapsed && DOCUMENT_SECTION_LABELS[type]}
           </button>
         </li>
       );

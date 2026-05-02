@@ -172,7 +172,7 @@ describe("POST /api/saved-prompts/[id]/convert", () => {
     expect(mockDocCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          type: "PLOT",
+          type: "BRAINSTORM",
           storyId: "story-1",
         }),
       }),
@@ -186,7 +186,7 @@ describe("POST /api/saved-prompts/[id]/convert", () => {
     );
   });
 
-  test("Plot document tiptapJson contains logline as Premise content", async () => {
+  test("Brainstorm document tiptapJson contains prompt as Ideas content", async () => {
     const req = makeRequest("http://localhost/api/saved-prompts/sp-1/convert", {
       name: "Detective Story",
       rating: "G",
@@ -198,11 +198,11 @@ describe("POST /api/saved-prompts/[id]/convert", () => {
     };
     const content = docCall.data.tiptapJson.content;
 
-    const premiseIdx = content.findIndex(
-      (n) => n.type === "heading" && n.content?.[0]?.text === "Premise",
+    const ideasIdx = content.findIndex(
+      (n) => n.type === "heading" && n.content?.[0]?.text === "Ideas",
     );
-    expect(premiseIdx).toBeGreaterThanOrEqual(0);
-    const nextNode = content[premiseIdx + 1];
+    expect(ideasIdx).toBeGreaterThanOrEqual(0);
+    const nextNode = content[ideasIdx + 1];
     expect(nextNode?.type).toBe("paragraph");
     expect(nextNode?.content?.[0]?.text).toBe(savedPrompt.content);
   });

@@ -32,6 +32,11 @@ function heading(text: string): TipTapHeadingNode {
 }
 
 const TEMPLATE_HEADINGS: Partial<Record<DocumentTypeValue, string[]>> = {
+  BRAINSTORM: [
+    "Ideas",
+    "Questions to Explore",
+    "Possible Directions",
+  ],
   CHARACTER: [
     "Name / Aliases",
     "Role (Protagonist / Antagonist / Supporting / Other)",
@@ -76,6 +81,19 @@ const TEMPLATE_HEADINGS: Partial<Record<DocumentTypeValue, string[]>> = {
 export function buildTemplate(type: DocumentTypeValue): Prisma.InputJsonValue {
   const headings = TEMPLATE_HEADINGS[type];
   const doc: TipTapTemplateDoc = { type: "doc", content: headings ? headings.map(heading) : [] };
+  return doc as unknown as Prisma.InputJsonValue;
+}
+
+export function buildBrainstormTemplateWithPrompt(prompt: string): Prisma.InputJsonValue {
+  const headings = TEMPLATE_HEADINGS["BRAINSTORM"] ?? [];
+  const content: (TipTapHeadingNode | TipTapParagraphNode)[] = [];
+  for (const text of headings) {
+    content.push(heading(text));
+    if (text === "Ideas") {
+      content.push({ type: "paragraph", content: [{ type: "text", text: prompt }] });
+    }
+  }
+  const doc: TipTapPlotDoc = { type: "doc", content };
   return doc as unknown as Prisma.InputJsonValue;
 }
 

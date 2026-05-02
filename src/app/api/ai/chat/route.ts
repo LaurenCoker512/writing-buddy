@@ -126,7 +126,8 @@ export async function POST(req: NextRequest) {
         )
       : [];
 
-  const tier2Context = buildTier2Context(freshSiblings, document.type);
+  const structuredSiblings = freshSiblings.filter((s) => s.type !== "BRAINSTORM");
+  const tier2Context = buildTier2Context(structuredSiblings, document.type);
 
   let canonContext: string | null = null;
   if (owner.mode === "FANFIC") {
@@ -179,6 +180,7 @@ export async function POST(req: NextRequest) {
     tier2Context || null,
     canonContext,
     userSettings?.explicitEnabled ?? false,
+    document.type,
   );
 
   let providerStream: ReadableStream<Uint8Array>;
