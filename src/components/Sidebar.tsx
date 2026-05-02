@@ -229,7 +229,7 @@ function SortableSceneItem({
         {!collapsed && (
           <button
             onClick={onContextMenu}
-            className="invisible shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:visible"
+            className="opacity-0 shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:opacity-100 focus:opacity-100"
             aria-label={`Options for ${doc.name}`}
             data-testid={`document-menu-${doc.id}`}
           >
@@ -404,24 +404,45 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     setContextMenu({ id, type, name, x: rect.right + 4, y: rect.top, meta, docType });
   };
 
+  const NODE_API: Record<NodeType, string> = {
+    universe: "/api/universes",
+    series: "/api/series",
+    story: "/api/stories",
+    document: "/api/documents",
+  };
+
   const handleRename = async (name: string) => {
     if (!renameModal) return;
-    await fetch(`/api/${renameModal.type}s/${renameModal.id}`, {
+    await fetch(`${NODE_API[renameModal.type]}/${renameModal.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
     });
     setRenameModal(null);
     void fetchTree();
+    // Refresh server-component data so page headers (e.g. the document <h1>)
+    // reflect the new name without a full navigation.
+    router.refresh();
   };
 
   const handleDelete = async () => {
     if (!deleteModal) return;
-    await fetch(`/api/${deleteModal.type}s/${deleteModal.id}`, {
+    await fetch(`${NODE_API[deleteModal.type]}/${deleteModal.id}`, {
       method: "DELETE",
     });
+
+    // Navigate away before tearing down state, so the deleted page isn't left
+    // open as a 404 if the user was viewing it.
+    const shouldRedirect =
+      deleteModal.type === "document" &&
+      pathname === `/dashboard/documents/${deleteModal.id}`;
+
     setDeleteModal(null);
     void fetchTree();
+
+    if (shouldRedirect) {
+      router.push("/dashboard");
+    }
   };
 
   const handleDuplicateAsAu = async () => {
@@ -434,13 +455,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   };
 
   const handleCreate = async (data: CreateData) => {
-    const endpointMap: Record<NodeType, string> = {
-      universe: "/api/universes",
-      series: "/api/series",
-      story: "/api/stories",
-      document: "/api/documents",
-    };
-    const endpoint = endpointMap[data.itemType];
+    const endpoint = NODE_API[data.itemType];
     const body: Record<string, unknown> = {
       name: data.name,
       mode: data.mode,
@@ -514,7 +529,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         {!collapsed && (
           <button
             onClick={(e) => openContextMenu(e, doc.id, "document", doc.name, doc.meta, doc.type)}
-            className="invisible shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:visible"
+            className="opacity-0 shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:opacity-100 focus:opacity-100"
             aria-label={`Options for ${doc.name}`}
             data-testid={`document-menu-${doc.id}`}
           >
@@ -649,7 +664,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                   e.stopPropagation();
                   setNewDocumentModal({ parentId: story.id, parentName: story.name, parentType: "story", storyMode: story.mode });
                 }}
-                className="invisible shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:visible"
+                className="opacity-0 shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:opacity-100 focus:opacity-100"
                 aria-label={`Add document to ${story.name}`}
                 data-testid={`story-add-doc-${story.id}`}
               >
@@ -657,7 +672,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               </button>
               <button
                 onClick={(e) => openContextMenu(e, story.id, "story", story.name)}
-                className="invisible shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:visible"
+                className="opacity-0 shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:opacity-100 focus:opacity-100"
                 aria-label={`Options for ${story.name}`}
                 data-testid={`story-menu-${story.id}`}
               >
@@ -725,7 +740,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               onClick={(e) =>
                 openContextMenu(e, series.id, "series", series.name)
               }
-              className="invisible shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:visible"
+              className="opacity-0 shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:opacity-100 focus:opacity-100"
               aria-label={`Options for ${series.name}`}
               data-testid={`series-menu-${series.id}`}
             >
@@ -782,7 +797,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                   e.stopPropagation();
                   setNewDocumentModal({ parentId: universe.id, parentName: universe.name, parentType: "universe" });
                 }}
-                className="invisible shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:visible"
+                className="opacity-0 shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:opacity-100 focus:opacity-100"
                 aria-label={`Add document to ${universe.name}`}
                 data-testid={`universe-add-doc-${universe.id}`}
               >
@@ -792,7 +807,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                 onClick={(e) =>
                   openContextMenu(e, universe.id, "universe", universe.name)
                 }
-                className="invisible shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:visible"
+                className="opacity-0 shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:opacity-100 focus:opacity-100"
                 aria-label={`Options for ${universe.name}`}
                 data-testid={`universe-menu-${universe.id}`}
               >

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Warm rounded square background -->
+  <rect width="32" height="32" rx="7" fill="#92400e"/>
+  <!-- Pen nib body -->
+  <path d="M16 6 L24 14 L16 26 L8 14 Z" fill="#fef3c7"/>
+  <!-- Nib center slit -->
+  <line x1="16" y1="14" x2="16" y2="26" stroke="#92400e" stroke-width="1.2" stroke-linecap="round"/>
+  <!-- Nib top cap/ferrule -->
+  <rect x="12" y="5" width="8" height="4" rx="2" fill="#fbbf24"/>
+</svg>

@@ -52,7 +52,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     });
 
     if (universe !== null && validIds.length > 0) {
-      const docs = await ensureContentSummariesFresh(validIds, provider);
+      // Verify all supplied IDs actually belong to the user's universe before fetching content.
+      const ownedIds = await prisma.document
+        .findMany({
+          where: { id: { in: validIds }, universeId: body.universeId },
+          select: { id: true },
+        })
+        .then((docs) => docs.map((d) => d.id));
+
+      const docs = await ensureContentSummariesFresh(ownedIds, provider);
       const docsWithSummaries = docs.filter(
         (d): d is typeof d & { contentSummary: string } =>
           d.contentSummary !== null && d.contentSummary.trim() !== "",

@@ -19,8 +19,10 @@ dist/
 # Prisma
 prisma/dev.db
 
-# Test coverage
+# Test coverage and results
 coverage/
+test-results/
+playwright-report/
 
 # Editor
 .idea/

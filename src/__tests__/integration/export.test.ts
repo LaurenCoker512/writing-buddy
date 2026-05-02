@@ -152,6 +152,33 @@ describe("GET /api/export/project/[id]", () => {
     expect(files.some((f) => f.endsWith(".md") && !f.endsWith("README.md"))).toBe(true);
   });
 
+  test("document with special characters in name uses a safe filename (no path traversal)", async () => {
+    mockStoryFindFirst.mockResolvedValue({
+      ...existingStory,
+      documents: [{ ...existingDocument, name: "My/Doc: Test?" }],
+    });
+
+    const JSZip = (await import("jszip")).default;
+    const res = await GET_ZIP(makeRequest(), PROJECT_PARAMS);
+    const buffer = Buffer.from(await res.arrayBuffer());
+    const zip = await JSZip.loadAsync(buffer);
+    const files = Object.keys(zip.files);
+
+    // Document files: ends with .md but not README.md
+    const docFiles = files.filter(
+      (f) => f.endsWith(".md") && !f.endsWith("README.md"),
+    );
+    expect(docFiles.length).toBeGreaterThan(0);
+
+    // Each path has exactly 3 segments: {story}/{section}/{filename}.md
+    // A "/" in the original name would add an extra segment
+    expect(docFiles.every((f) => f.split("/").length === 3)).toBe(true);
+
+    // "My/Doc: Test?" → strip [/:?] → "MyDoc Test" → "MyDoc-Test"
+    const filenames = docFiles.map((f) => f.split("/")[2]);
+    expect(filenames.some((name) => name === "MyDoc-Test.md")).toBe(true);
+  });
+
   test("returns 401 when unauthenticated", async () => {
     mockAuth.mockResolvedValue(null);
     const res = await GET_ZIP(makeRequest(), PROJECT_PARAMS);

@@ -35,9 +35,8 @@ test.describe("Split-View Layout", () => {
 
   test("drag divider resizes panels; both remain visible", async ({
     page,
-    request,
   }) => {
-    const docId = await createStoryAndDocument(request);
+    const docId = await createStoryAndDocument(page.request);
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto(`/dashboard/documents/${docId}`);
     await page.waitForSelector('[data-testid="tiptap-editor"]');
@@ -65,9 +64,8 @@ test.describe("Split-View Layout", () => {
 
   test("panels stack vertically on tablet viewport", async ({
     page,
-    request,
   }) => {
-    const docId = await createStoryAndDocument(request);
+    const docId = await createStoryAndDocument(page.request);
     await page.setViewportSize({ width: 900, height: 700 });
     await page.goto(`/dashboard/documents/${docId}`);
     await page.waitForSelector('[data-testid="tiptap-editor"]');
@@ -87,8 +85,8 @@ test.describe("Split-View Layout", () => {
     await expect(page.locator('[data-testid="split-divider"]')).not.toBeVisible();
   });
 
-  test("mobile toggle hides and reveals panels", async ({ page, request }) => {
-    const docId = await createStoryAndDocument(request);
+  test("mobile toggle hides and reveals panels", async ({ page }) => {
+    const docId = await createStoryAndDocument(page.request);
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto(`/dashboard/documents/${docId}`);
     await page.waitForSelector('[data-testid="tiptap-editor"]');

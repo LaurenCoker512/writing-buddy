@@ -62,11 +62,10 @@ test.describe("Version History Panel", () => {
 
   test("version appears in history panel after creation", async ({
     page,
-    request,
   }) => {
-    const storyId = await createStory(request);
-    const docId = await createDocument(request, storyId);
-    await createVersion(request, docId, "Version one content");
+    const storyId = await createStory(page.request);
+    const docId = await createDocument(page.request, storyId);
+    await createVersion(page.request, docId, "Version one content");
 
     await page.goto(`/dashboard/documents/${docId}`);
     await page.waitForSelector('[data-testid="tiptap-editor"]');
@@ -79,13 +78,12 @@ test.describe("Version History Panel", () => {
 
   test("restoring a version reverts document content and adds new history entry", async ({
     page,
-    request,
   }) => {
-    const storyId = await createStory(request);
-    const docId = await createDocument(request, storyId);
+    const storyId = await createStory(page.request);
+    const docId = await createDocument(page.request, storyId);
 
     // Create an older version with distinctive content
-    await createVersion(request, docId, "Original version content");
+    await createVersion(page.request, docId, "Original version content");
 
     // Update the document to newer content
     const newerJson = {
@@ -97,7 +95,7 @@ test.describe("Version History Panel", () => {
         },
       ],
     };
-    await request.patch(`${BASE}/api/documents/${docId}`, {
+    await page.request.patch(`${BASE}/api/documents/${docId}`, {
       data: { tiptapJson: newerJson },
     });
 

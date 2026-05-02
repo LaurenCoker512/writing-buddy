@@ -36,15 +36,19 @@ async function createScene(
 }
 
 test.describe("Scene Ordering", () => {
-  test("drag Scene 3 above Scene 1; verify sidebar order updates", async ({ page, request }) => {
+  test("drag Scene 3 above Scene 1; verify sidebar order updates", async ({ page }) => {
     await registerAndLogin(page);
 
-    const storyId = await createStory(request);
-    await createScene(request, "Scene 1", storyId);
-    await createScene(request, "Scene 2", storyId);
-    await createScene(request, "Scene 3", storyId);
+    const storyId = await createStory(page.request);
+    await createScene(page.request, "Scene 1", storyId);
+    await createScene(page.request, "Scene 2", storyId);
+    await createScene(page.request, "Scene 3", storyId);
 
     await page.reload();
+
+    // Expand the story so document nodes render in the sidebar
+    const storyRow = page.getByTestId(`story-node-${storyId}`).locator("..");
+    await storyRow.getByLabel("Expand").click();
     await page.waitForSelector('[data-testid^="document-node-"]');
 
     // Find all scene items in the sidebar under the Scenes section
