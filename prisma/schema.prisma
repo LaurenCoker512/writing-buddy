@@ -81,11 +81,12 @@ model Universe {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  series       Series[]
-  stories      Story[]
-  documents    Document[]
-  savedPrompts SavedPrompt[]
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  series        Series[]
+  stories       Story[]
+  documents     Document[]
+  savedPrompts  SavedPrompt[]
+  subcategories DocumentSubcategory[]
 }
 
 model Series {
@@ -98,10 +99,11 @@ model Series {
   rating      Rating
   createdAt   DateTime @default(now())
 
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  universe  Universe? @relation(fields: [universeId], references: [id], onDelete: SetNull)
-  stories   Story[]
-  documents Document[]
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  universe      Universe?             @relation(fields: [universeId], references: [id], onDelete: SetNull)
+  stories       Story[]
+  documents     Document[]
+  subcategories DocumentSubcategory[]
 }
 
 model Story {
@@ -115,11 +117,12 @@ model Story {
   rating      Rating
   createdAt   DateTime @default(now())
 
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  universe     Universe?     @relation(fields: [universeId], references: [id], onDelete: SetNull)
-  series       Series?       @relation(fields: [seriesId], references: [id], onDelete: SetNull)
-  documents    Document[]
-  savedPrompts SavedPrompt[]
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  universe      Universe?             @relation(fields: [universeId], references: [id], onDelete: SetNull)
+  series        Series?               @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  documents     Document[]
+  savedPrompts  SavedPrompt[]
+  subcategories DocumentSubcategory[]
 }
 
 model Document {
@@ -131,6 +134,7 @@ model Document {
   contentSummary            String?      // AI-generated summary for sibling document context
   contentSummaryGeneratedAt DateTime?    // staleness check: regenerate if older than updatedAt
   parentDocumentId          String?      // link to Universe-level parent for per-story specialization
+  subcategoryId             String?      // optional sidebar subcategory grouping
   order                     Float?       // display order within section; Float allows gap-free insertion
   universeId                String?
   seriesId                  String?
@@ -139,13 +143,31 @@ model Document {
   createdAt                 DateTime     @default(now())
   updatedAt                 DateTime     @updatedAt
 
-  universe        Universe?         @relation(fields: [universeId], references: [id], onDelete: Cascade)
-  series          Series?           @relation(fields: [seriesId], references: [id], onDelete: Cascade)
-  story           Story?            @relation(fields: [storyId], references: [id], onDelete: Cascade)
-  parent          Document?         @relation("DocumentSpecialization", fields: [parentDocumentId], references: [id], onDelete: SetNull)
-  specializations Document[]        @relation("DocumentSpecialization")
+  universe        Universe?             @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  series          Series?               @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  story           Story?                @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  parent          Document?             @relation("DocumentSpecialization", fields: [parentDocumentId], references: [id], onDelete: SetNull)
+  specializations Document[]            @relation("DocumentSpecialization")
+  subcategory     DocumentSubcategory?  @relation(fields: [subcategoryId], references: [id], onDelete: SetNull)
   versions        DocumentVersion[]
   chatMessages    ChatMessage[]
+}
+
+model DocumentSubcategory {
+  id           String       @id @default(cuid())
+  name         String
+  documentType DocumentType
+  order        Float?
+  universeId   String?
+  seriesId     String?
+  storyId      String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  universe  Universe? @relation(fields: [universeId], references: [id], onDelete: Cascade)
+  series    Series?   @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  story     Story?    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  documents Document[]
 }
 
 model DocumentVersion {

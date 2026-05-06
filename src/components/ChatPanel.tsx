@@ -11,17 +11,32 @@ import { TrashIcon } from "@/components/icons";
 
 type PanelMode = "chat" | "edit" | "analyze";
 
-type ChatMessage = { kind: "message"; key: string; id?: string; role: "user" | "assistant"; content: string };
-type DiffItem = { kind: "diff"; key: string; proposal: DiffProposal };
-type AnalysisItem = { kind: "analysis"; key: string; sections: AnalysisSection[] };
+type ChatMessage = { kind: "message"; key: string; id?: string; role: "user" | "assistant"; content: string; mode: PanelMode };
+type DiffItem = { kind: "diff"; key: string; proposal: DiffProposal; mode: PanelMode };
+type AnalysisItem = { kind: "analysis"; key: string; sections: AnalysisSection[]; mode: PanelMode };
 type ChatItem = ChatMessage | DiffItem | AnalysisItem;
 
 const ANALYZE_PREVIEW_LENGTH = 200;
+const MESSAGE_COLLAPSE_THRESHOLD = 400;
 
 interface ChatPanelProps {
   documentId: string;
   onAcceptDiff: (proposal: DiffProposal) => Promise<void>;
   initialDiffProposals?: DiffProposal[];
+}
+
+function ThinkingSpinner() {
+  return (
+    <div className="flex justify-start">
+      <div className="rounded-2xl border border-border bg-surface px-4 py-3">
+        <span
+          className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-text-muted border-t-transparent"
+          aria-label="Waiting for response"
+          role="status"
+        />
+      </div>
+    </div>
+  );
 }
 
 function AssistantMessageContent({ content }: { content: string }) {
@@ -65,11 +80,21 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [mode, setMode] = useState<PanelMode>("chat");
   const [noApiKey, setNoApiKey] = useState(false);
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const bottomRef = useRef<HTMLDivElement>(null);
   const keyCounter = useRef(0);
 
   function nextKey() {
     return String(keyCounter.current++);
+  }
+
+  function toggleExpanded(key: string) {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   }
 
   useEffect(() => {
@@ -85,11 +110,12 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
             .filter((m): m is { id: string; role: "user" | "assistant"; content: string } =>
               m.role === "user" || m.role === "assistant",
             )
-            .map((m) => ({ kind: "message", key: nextKey(), id: m.id, role: m.role, content: m.content }));
+            .map((m) => ({ kind: "message", key: nextKey(), id: m.id, role: m.role, content: m.content, mode: "chat" as PanelMode }));
           const pendingDiffs: ChatItem[] = (initialDiffProposals ?? []).map((proposal) => ({
             kind: "diff",
             key: nextKey(),
             proposal,
+            mode: "edit" as PanelMode,
           }));
           setItems([...loaded, ...pendingDiffs]);
           setChatSummary(data.chatSummary);
@@ -114,8 +140,8 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
     const assistantKey = nextKey();
     setItems((prev) => [
       ...prev,
-      { kind: "message", key: userKey, role: "user", content },
-      { kind: "message", key: assistantKey, role: "assistant", content: "" },
+      { kind: "message", key: userKey, role: "user", content, mode: "chat" },
+      { kind: "message", key: assistantKey, role: "assistant", content: "", mode: "chat" },
     ]);
     setInput("");
     setIsStreaming(true);
@@ -201,7 +227,7 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
     const userKey = nextKey();
     setItems((prev) => [
       ...prev,
-      { kind: "message", key: userKey, role: "user", content: `[Edit request] ${instruction}` },
+      { kind: "message", key: userKey, role: "user", content: `[Edit request] ${instruction}`, mode: "edit" },
     ]);
 
     try {
@@ -225,6 +251,7 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
             key: nextKey(),
             role: "assistant",
             content: "Could not generate edit proposals. Please try again.",
+            mode: "edit",
           },
         ]);
         return;
@@ -241,6 +268,7 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
             key: nextKey(),
             role: "assistant",
             content: "No edit proposals were generated. Try rephrasing your instruction.",
+            mode: "edit",
           },
         ]);
         return;
@@ -249,7 +277,7 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
       setItems((prev) => [
         ...prev,
         ...proposals.map(
-          (proposal): DiffItem => ({ kind: "diff", key: nextKey(), proposal }),
+          (proposal): DiffItem => ({ kind: "diff", key: nextKey(), proposal, mode: "edit" }),
         ),
       ]);
     } catch {
@@ -260,6 +288,7 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
           key: nextKey(),
           role: "assistant",
           content: "Something went wrong. Please try again.",
+          mode: "edit",
         },
       ]);
     } finally {
@@ -283,7 +312,7 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
     const userKey = nextKey();
     setItems((prev) => [
       ...prev,
-      { kind: "message", key: userKey, role: "user", content: `[Analyze] ${preview}` },
+      { kind: "message", key: userKey, role: "user", content: `[Analyze] ${preview}`, mode: "analyze" },
     ]);
 
     try {
@@ -307,6 +336,7 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
             key: nextKey(),
             role: "assistant",
             content: "Could not analyze content. Please try again.",
+            mode: "analyze",
           },
         ]);
         return;
@@ -323,6 +353,7 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
             key: nextKey(),
             role: "assistant",
             content: "No relevant details were found for this document. Try a different excerpt.",
+            mode: "analyze",
           },
         ]);
         return;
@@ -330,7 +361,7 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
 
       setItems((prev) => [
         ...prev,
-        { kind: "analysis", key: nextKey(), sections },
+        { kind: "analysis", key: nextKey(), sections, mode: "analyze" },
       ]);
     } catch {
       setItems((prev) => [
@@ -340,6 +371,7 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
           key: nextKey(),
           role: "assistant",
           content: "Something went wrong. Please try again.",
+          mode: "analyze",
         },
       ]);
     } finally {
@@ -356,12 +388,15 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
     setItems((prev) => prev.filter((item) => !(item.kind === "diff" && item.proposal.id === proposalId)));
   }
 
-  async function deleteMessage(messageId: string, itemKey: string) {
-    await fetch(`/api/documents/${documentId}/messages/${messageId}`, { method: "DELETE" });
+  async function deleteItem(itemKey: string, messageId?: string) {
+    if (messageId) {
+      await fetch(`/api/documents/${documentId}/messages/${messageId}`, { method: "DELETE" });
+    }
     setItems((prev) => prev.filter((item) => item.key !== itemKey));
   }
 
   const isBusy = isStreaming || isRequestingDiff || isAnalyzing;
+  const displayItems = items.filter((item) => item.mode === mode);
 
   return (
     <div className="flex h-full flex-col">
@@ -393,7 +428,7 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
           <p className="py-8 text-center text-sm text-text-muted">Loading chat history…</p>
         )}
 
-        {!isLoadingHistory && items.length === 0 && !noApiKey && (
+        {!isLoadingHistory && displayItems.length === 0 && !noApiKey && (
           <p className="py-8 text-center text-sm text-text-muted">
             {mode === "edit"
               ? "Describe the edits you want to make to your document."
@@ -418,14 +453,20 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
 
         {!isLoadingHistory && (
           <div className="flex flex-col gap-4">
-            {chatSummary !== null && (
+            {mode === "chat" && chatSummary !== null && (
               <p className="text-center text-xs italic text-text-muted">
                 Earlier conversation has been summarized.
               </p>
             )}
-            {items.map((item, index) => {
+            {displayItems.map((item, index) => {
               if (item.kind === "analysis") {
-                return <AnalysisCard key={item.key} sections={item.sections} />;
+                return (
+                  <AnalysisCard
+                    key={item.key}
+                    sections={item.sections}
+                    onDismiss={() => void deleteItem(item.key)}
+                  />
+                );
               }
 
               if (item.kind === "diff") {
@@ -439,10 +480,12 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
                 );
               }
 
-              const isLastStreaming = isStreaming && index === items.length - 1;
-              const deleteBtn = item.id && !isLastStreaming ? (
+              const isLastStreaming = isStreaming && index === displayItems.length - 1;
+              const isLong = item.content.length > MESSAGE_COLLAPSE_THRESHOLD && !isLastStreaming;
+              const isExpanded = expandedKeys.has(item.key);
+              const deleteBtn = !isLastStreaming ? (
                 <button
-                  onClick={() => void deleteMessage(item.id!, item.key)}
+                  onClick={() => void deleteItem(item.key, item.id)}
                   className="invisible mt-1 shrink-0 rounded p-1 text-text-muted transition-colors hover:bg-background hover:text-red-500 group-hover:visible"
                   aria-label="Delete message"
                 >
@@ -463,28 +506,44 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
                         : "border border-border bg-surface text-text-primary"
                     }`}
                   >
-                    {isLastStreaming && !item.content ? (
-                      <span
-                        className="inline-block h-4 w-2 animate-pulse bg-text-muted"
-                        aria-label="Loading response"
-                      />
-                    ) : item.role === "assistant" ? (
-                      <AssistantMessageContent content={item.content} />
-                    ) : (
-                      <p className="whitespace-pre-wrap">{item.content}</p>
+                    <div className={isLong && !isExpanded ? "max-h-40 overflow-hidden" : undefined}>
+                      {isLastStreaming && !item.content ? (
+                        <span
+                          className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-text-muted border-t-transparent"
+                          aria-label="Waiting for response"
+                          role="status"
+                        />
+                      ) : item.role === "assistant" ? (
+                        <AssistantMessageContent content={item.content} />
+                      ) : (
+                        <p className="whitespace-pre-wrap">{item.content}</p>
+                      )}
+                    </div>
+                    {isLong && (
+                      <button
+                        onClick={() => toggleExpanded(item.key)}
+                        className={`mt-2 text-xs font-medium transition-opacity hover:opacity-100 ${
+                          item.role === "user"
+                            ? "text-white/70 hover:text-white"
+                            : "text-text-muted hover:text-text-primary"
+                        }`}
+                      >
+                        {isExpanded ? "Show less" : "Show more"}
+                      </button>
                     )}
                   </div>
                   {item.role === "assistant" && deleteBtn}
                 </div>
               );
             })}
+            {((isRequestingDiff && mode === "edit") || (isAnalyzing && mode === "analyze")) && <ThinkingSpinner />}
           </div>
         )}
         <div ref={bottomRef} />
       </div>
 
       <div className="shrink-0 border-t border-border p-4">
-        <div className="flex gap-2">
+        <div className="flex items-end gap-2">
           <textarea
             className="flex-1 resize-none rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent"
             placeholder={

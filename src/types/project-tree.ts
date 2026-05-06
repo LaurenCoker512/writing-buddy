@@ -1,3 +1,10 @@
+export interface SubcategoryItem {
+  id: string;
+  name: string;
+  documentType: string;
+  order: number | null;
+}
+
 export interface DocumentItem {
   id: string;
   name: string;
@@ -5,6 +12,7 @@ export interface DocumentItem {
   order: number | null;
   parentDocumentId: string | null;
   meta: Record<string, unknown> | null;
+  subcategoryId: string | null;
 }
 
 export interface StoryItem {
@@ -13,6 +21,7 @@ export interface StoryItem {
   mode: string;
   rating: string;
   documents: DocumentItem[];
+  subcategories: SubcategoryItem[];
 }
 
 export interface SeriesItem {
@@ -31,6 +40,7 @@ export interface UniverseItem {
   series: SeriesItem[];
   stories: StoryItem[];
   documents: DocumentItem[];
+  subcategories: SubcategoryItem[];
 }
 
 export interface ProjectTree {
@@ -39,4 +49,4 @@ export interface ProjectTree {
   standaloneStories: StoryItem[];
 }
 
-export type NodeType = "universe" | "series" | "story" | "document";
+export type NodeType = "universe" | "series" | "story" | "document" | "subcategory";

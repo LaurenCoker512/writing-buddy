@@ -24,6 +24,7 @@ import type {
   ProjectTree,
   SeriesItem,
   StoryItem,
+  SubcategoryItem,
   UniverseItem,
 } from "@/types/project-tree";
 import {
@@ -69,7 +70,16 @@ interface ContextMenuState {
   y: number;
   meta?: Record<string, unknown> | null;
   docType?: string;
+  subcategoryId?: string | null;
+  availableSubcategories?: SubcategoryItem[];
 }
+
+type NewSubcategoryState = {
+  parentId: string;
+  parentType: "story" | "universe";
+  documentType: string;
+  value: string;
+};
 
 interface CanonIngestionState {
   universeId: string;
@@ -86,6 +96,7 @@ function ContextMenuDropdown({
   onImportCanon,
   onDuplicateAsAu,
   onCheckContradictions,
+  onSetSubcategory,
 }: {
   menu: ContextMenuState;
   onRename: () => void;
@@ -94,6 +105,7 @@ function ContextMenuDropdown({
   onImportCanon?: () => void;
   onDuplicateAsAu?: () => void;
   onCheckContradictions?: () => void;
+  onSetSubcategory?: (subcategoryId: string | null) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -133,13 +145,41 @@ function ContextMenuDropdown({
       )}
       {menu.type === "document" && (
         <>
+          {(menu.docType === "CHARACTER" || menu.docType === "WORLDBUILDING" || menu.docType === "SCENE") &&
+            onSetSubcategory !== undefined &&
+            menu.availableSubcategories !== undefined && (
+              <div className="border-t border-border py-1">
+                <p className="px-4 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+                  Subcategory
+                </p>
+                <button
+                  role="menuitem"
+                  className={`${menuItemClass} ${menu.subcategoryId === null || menu.subcategoryId === undefined ? "font-semibold" : ""}`}
+                  onClick={() => { onSetSubcategory(null); onClose(); }}
+                >
+                  None
+                </button>
+                {menu.availableSubcategories.map((sub) => (
+                  <button
+                    key={sub.id}
+                    role="menuitem"
+                    className={`${menuItemClass} ${menu.subcategoryId === sub.id ? "font-semibold" : ""}`}
+                    onClick={() => { onSetSubcategory(sub.id); onClose(); }}
+                  >
+                    {sub.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          {/* TODO: AU vs Canon feature — expand into a full workflow before re-enabling.
+               "Duplicate as AU" context menu item hidden until the feature is complete.
           {(menu.docType === "CHARACTER" || menu.docType === "WORLDBUILDING") &&
             menu.meta?.isCanon === true &&
             onDuplicateAsAu !== undefined && (
               <button role="menuitem" className={menuItemClass} onClick={onDuplicateAsAu}>
                 Duplicate as AU
               </button>
-            )}
+            )} */}
           <a
             role="menuitem"
             href={`/api/export/document/${menu.id}/markdown`}
@@ -246,18 +286,22 @@ function SortableSceneList({
   depth,
   pathname,
   collapsed,
+  availableSubcategories,
   onContextMenu,
 }: {
   docs: DocumentItem[];
   depth: number;
   pathname: string;
   collapsed: boolean;
+  availableSubcategories: SubcategoryItem[];
   onContextMenu: (
     e: React.MouseEvent,
     id: string,
     name: string,
     meta?: Record<string, unknown> | null,
     docType?: string,
+    subcategoryId?: string | null,
+    availableSubcategories?: SubcategoryItem[],
   ) => void;
 }) {
   const [docs, setDocs] = useState(initialDocs);
@@ -303,7 +347,9 @@ function SortableSceneList({
             depth={depth}
             isActive={pathname === `/dashboard/documents/${doc.id}`}
             collapsed={collapsed}
-            onContextMenu={(e) => onContextMenu(e, doc.id, doc.name, doc.meta, doc.type)}
+            onContextMenu={(e) =>
+              onContextMenu(e, doc.id, doc.name, doc.meta, doc.type, doc.subcategoryId, availableSubcategories)
+            }
           />
         ))}
       </SortableContext>
@@ -333,6 +379,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const [canonIngestionModal, setCanonIngestionModal] = useState<CanonIngestionState | null>(null);
   const [contradictionModal, setContradictionModal] = useState<{ storyId: string; storyName: string } | null>(null);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [newSubcategoryState, setNewSubcategoryState] = useState<NewSubcategoryState | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem("sidebar-collapsed");
@@ -398,10 +445,39 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     name: string,
     meta?: Record<string, unknown> | null,
     docType?: string,
+    subcategoryId?: string | null,
+    availableSubcategories?: SubcategoryItem[],
   ) => {
     e.stopPropagation();
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setContextMenu({ id, type, name, x: rect.right + 4, y: rect.top, meta, docType });
+    setContextMenu({ id, type, name, x: rect.right + 4, y: rect.top, meta, docType, subcategoryId, availableSubcategories });
+  };
+
+  const handleSetSubcategory = async (docId: string, subcategoryId: string | null) => {
+    await fetch(`/api/documents/${docId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subcategoryId }),
+    });
+    setContextMenu(null);
+    void fetchTree();
+  };
+
+  const handleCreateSubcategory = async () => {
+    if (!newSubcategoryState) return;
+    const name = newSubcategoryState.value.trim();
+    setNewSubcategoryState(null);
+    if (!name) return;
+    await fetch("/api/subcategories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        documentType: newSubcategoryState.documentType,
+        [`${newSubcategoryState.parentType}Id`]: newSubcategoryState.parentId,
+      }),
+    });
+    void fetchTree();
   };
 
   const NODE_API: Record<NodeType, string> = {
@@ -409,6 +485,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     series: "/api/series",
     story: "/api/stories",
     document: "/api/documents",
+    subcategory: "/api/subcategories",
   };
 
   const handleRename = async (name: string) => {
@@ -488,7 +565,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
   // ── Tree node renderers ────────────────────────────────────────────────────
 
-  const renderDocumentNode = (doc: DocumentItem, depth: number) => {
+  const renderDocumentNode = (doc: DocumentItem, depth: number, availableSubcategories?: SubcategoryItem[]) => {
     const isActive = pathname === `/dashboard/documents/${doc.id}`;
     return (
     <li key={doc.id}>
@@ -513,6 +590,8 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             <FileIcon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
           )}
           {!collapsed && <span className="truncate">{doc.name}</span>}
+          {/* TODO: AU vs Canon feature — expand into a full workflow before re-enabling.
+               Sidebar Canon ("C") and AU badges hidden until the feature is complete.
           {!collapsed && doc.meta?.isCanon === true && (
             <span
               className="shrink-0 rounded border border-amber-200 bg-amber-50 px-1 py-0.5 text-[10px] font-semibold leading-none text-amber-700"
@@ -528,11 +607,13 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             >
               AU
             </span>
-          )}
+          )} */}
         </Link>
         {!collapsed && (
           <button
-            onClick={(e) => openContextMenu(e, doc.id, "document", doc.name, doc.meta, doc.type)}
+            onClick={(e) =>
+              openContextMenu(e, doc.id, "document", doc.name, doc.meta, doc.type, doc.subcategoryId, availableSubcategories)
+            }
             className="opacity-0 shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:opacity-100 focus:opacity-100"
             aria-label={`Options for ${doc.name}`}
             data-testid={`document-menu-${doc.id}`}
@@ -545,10 +626,14 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   );
   };
 
+  const SUBCATEGORY_TYPES = new Set(["CHARACTER", "WORLDBUILDING", "SCENE"]);
+
   const renderDocumentSections = (
     documents: DocumentItem[],
     depth: number,
     parentId: string,
+    parentType: "story" | "universe",
+    subcategories: SubcategoryItem[],
     mapHref?: string,
     mapAriaLabel?: string,
   ) =>
@@ -564,34 +649,135 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
       const isRelationship = type === "RELATIONSHIP";
       const hasMap = isRelationship && mapHref !== undefined;
-      if (docs.length === 0 && !hasMap) return [];
+      const supportsSubcategories = SUBCATEGORY_TYPES.has(type);
+      const typeSubs = supportsSubcategories ? subcategories.filter((s) => s.documentType === type) : [];
+
+      // Show new-subcategory inline input for this type if active
+      const isCreatingSubcat =
+        newSubcategoryState?.parentId === parentId && newSubcategoryState?.documentType === type;
+
+      if (docs.length === 0 && !hasMap && !isCreatingSubcat) return [];
 
       const sectionKey = `${parentId}-${type}`;
       const isSectionCollapsed = collapsedSections.has(sectionKey);
 
       const isBrainstormSection = type === "BRAINSTORM";
       const sectionLabel = (
-        <li key={`section-${type}`}>
-          <button
-            onClick={() => toggleSection(sectionKey)}
-            className={`flex w-full items-center gap-1 pb-0.5 pt-2 text-xs font-medium uppercase tracking-wide hover:text-text-primary ${isBrainstormSection ? "text-accent/70" : "text-text-muted"}`}
-            style={{ paddingLeft: `${depth * 12 + 8}px` }}
-            aria-expanded={!isSectionCollapsed}
-          >
-            {!collapsed && <ChevronIcon expanded={!isSectionCollapsed} className="h-2.5 w-2.5 shrink-0" />}
-            {!collapsed && isBrainstormSection && (
-              <BrainstormIcon className="h-3 w-3 shrink-0" />
+        <li key={`section-${type}`} className="group/section">
+          <div className="flex items-center" style={{ paddingRight: "8px" }}>
+            <button
+              onClick={() => toggleSection(sectionKey)}
+              className={`flex flex-1 items-center gap-1 pb-0.5 pt-2 text-xs font-medium uppercase tracking-wide hover:text-text-primary ${isBrainstormSection ? "text-accent/70" : "text-text-muted"}`}
+              style={{ paddingLeft: `${depth * 12 + 8}px` }}
+              aria-expanded={!isSectionCollapsed}
+            >
+              {!collapsed && <ChevronIcon expanded={!isSectionCollapsed} className="h-2.5 w-2.5 shrink-0" />}
+              {!collapsed && isBrainstormSection && (
+                <BrainstormIcon className="h-3 w-3 shrink-0" />
+              )}
+              {!collapsed && DOCUMENT_SECTION_LABELS[type]}
+            </button>
+            {!collapsed && supportsSubcategories && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setNewSubcategoryState({ parentId, parentType, documentType: type, value: "" });
+                  if (isSectionCollapsed) toggleSection(sectionKey);
+                }}
+                className="invisible shrink-0 rounded p-0.5 text-text-muted hover:bg-border hover:text-text-primary group-hover/section:visible"
+                aria-label={`Add subcategory for ${DOCUMENT_SECTION_LABELS[type]}`}
+              >
+                <PlusIcon className="h-3 w-3" />
+              </button>
             )}
-            {!collapsed && DOCUMENT_SECTION_LABELS[type]}
-          </button>
+          </div>
         </li>
       );
 
       if (isSectionCollapsed) return [sectionLabel];
 
-      if (type === "SCENE") {
+      // Inline new-subcategory input
+      const newSubcatInput = isCreatingSubcat ? (
+        <li key={`new-subcat-${parentId}-${type}`}>
+          <div style={{ paddingLeft: `${depth * 12 + 20}px`, paddingRight: "8px" }} className="pb-0.5 pt-1">
+            <input
+              type="text"
+              autoFocus
+              value={newSubcategoryState!.value}
+              onChange={(e) =>
+                setNewSubcategoryState((prev) => (prev ? { ...prev, value: e.target.value } : null))
+              }
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleCreateSubcategory();
+                if (e.key === "Escape") setNewSubcategoryState(null);
+              }}
+              onBlur={() => void handleCreateSubcategory()}
+              placeholder="Subcategory name…"
+              className="w-full rounded border border-accent bg-background px-2 py-0.5 text-xs text-text-primary outline-none focus:ring-1 focus:ring-accent"
+              aria-label="New subcategory name"
+            />
+          </div>
+        </li>
+      ) : null;
+
+      // Subcategory group renderer
+      const renderSubcatGroup = (sub: SubcategoryItem, subDocs: DocumentItem[]) => {
+        const subKey = `${parentId}-subcat-${sub.id}`;
+        const isSubCollapsed = collapsedSections.has(subKey);
+
+        const subHeader = (
+          <li key={`subcat-header-${sub.id}`} className="group/subcat">
+            <div className="flex items-center" style={{ paddingLeft: `${depth * 12 + 20}px`, paddingRight: "8px" }}>
+              <button
+                onClick={() => toggleSection(subKey)}
+                className="flex flex-1 items-center gap-1 py-0.5 text-xs text-text-muted hover:text-text-primary"
+                aria-expanded={!isSubCollapsed}
+              >
+                {!collapsed && <ChevronIcon expanded={!isSubCollapsed} className="h-2 w-2 shrink-0" />}
+                {!collapsed && <span className="truncate">{sub.name}</span>}
+              </button>
+              {!collapsed && (
+                <button
+                  onClick={(e) => openContextMenu(e, sub.id, "subcategory", sub.name)}
+                  className="invisible shrink-0 rounded p-0.5 text-text-muted hover:bg-border hover:text-text-primary group-hover/subcat:visible"
+                  aria-label={`Options for subcategory ${sub.name}`}
+                >
+                  <DotsIcon className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          </li>
+        );
+
+        if (isSubCollapsed) return [subHeader];
+
+        if (type === "SCENE") {
+          return [
+            subHeader,
+            <li key={`subcat-scene-${sub.id}`}>
+              <ul>
+                <SortableSceneList
+                  docs={subDocs}
+                  depth={depth + 1}
+                  pathname={pathname}
+                  collapsed={collapsed}
+                  availableSubcategories={typeSubs}
+                  onContextMenu={(e, id, name, meta, docType, subcategoryId, avail) =>
+                    openContextMenu(e, id, "document", name, meta, docType, subcategoryId, avail)
+                  }
+                />
+              </ul>
+            </li>,
+          ];
+        }
+
+        return [subHeader, ...subDocs.map((d) => renderDocumentNode(d, depth + 1, typeSubs))];
+      };
+
+      if (type === "SCENE" && typeSubs.length === 0) {
         return [
           sectionLabel,
+          ...(newSubcatInput ? [newSubcatInput] : []),
           <li key={`scene-list-${docs[0]?.id ?? type}`}>
             <ul>
               <SortableSceneList
@@ -599,8 +785,9 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                 depth={depth}
                 pathname={pathname}
                 collapsed={collapsed}
-                onContextMenu={(e, id, name, meta, docType) =>
-                  openContextMenu(e, id, "document", name, meta, docType)
+                availableSubcategories={typeSubs}
+                onContextMenu={(e, id, name, meta, docType, subcategoryId, avail) =>
+                  openContextMenu(e, id, "document", name, meta, docType, subcategoryId, avail)
                 }
               />
             </ul>
@@ -608,7 +795,50 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         ];
       }
 
-      const docNodes = docs.map((doc) => renderDocumentNode(doc, depth));
+      if (supportsSubcategories && typeSubs.length > 0) {
+        const subcatGroups = typeSubs.flatMap((sub) => {
+          const subDocs = docs.filter((d) => d.subcategoryId === sub.id);
+          return renderSubcatGroup(sub, subDocs);
+        });
+
+        const uncategorizedDocs = docs.filter((d) => !typeSubs.some((s) => s.id === d.subcategoryId));
+
+        const uncategorizedNodes =
+          uncategorizedDocs.length > 0
+            ? [
+                <li key={`uncat-label-${parentId}-${type}`}>
+                  <p
+                    className="pb-0.5 pt-1 text-[10px] uppercase tracking-wide text-text-muted/50"
+                    style={{ paddingLeft: `${depth * 12 + 22}px` }}
+                  >
+                    {!collapsed && "Uncategorized"}
+                  </p>
+                </li>,
+                ...(type === "SCENE"
+                  ? [
+                      <li key={`uncat-scene-${parentId}`}>
+                        <ul>
+                          <SortableSceneList
+                            docs={uncategorizedDocs}
+                            depth={depth + 1}
+                            pathname={pathname}
+                            collapsed={collapsed}
+                            availableSubcategories={typeSubs}
+                            onContextMenu={(e, id, name, meta, docType, subcategoryId, avail) =>
+                              openContextMenu(e, id, "document", name, meta, docType, subcategoryId, avail)
+                            }
+                          />
+                        </ul>
+                      </li>,
+                    ]
+                  : uncategorizedDocs.map((d) => renderDocumentNode(d, depth + 1, typeSubs))),
+              ]
+            : [];
+
+        return [sectionLabel, ...(newSubcatInput ? [newSubcatInput] : []), ...subcatGroups, ...uncategorizedNodes];
+      }
+
+      const docNodes = docs.map((d) => renderDocumentNode(d, depth, typeSubs.length > 0 ? typeSubs : undefined));
 
       if (hasMap) {
         const mapNode = (
@@ -630,10 +860,10 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             </div>
           </li>
         );
-        return [sectionLabel, ...docNodes, mapNode];
+        return [sectionLabel, ...(newSubcatInput ? [newSubcatInput] : []), ...docNodes, mapNode];
       }
 
-      return [sectionLabel, ...docNodes];
+      return [sectionLabel, ...(newSubcatInput ? [newSubcatInput] : []), ...docNodes];
     });
 
   const renderStoryNode = (story: StoryItem, depth: number) => {
@@ -695,6 +925,8 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               story.documents,
               depth + 1,
               story.id,
+              "story",
+              story.subcategories,
               `/dashboard/stories/${story.id}/map`,
               `Relationship Map for ${story.name}`,
             )}
@@ -830,6 +1062,8 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               universe.documents,
               1,
               universe.id,
+              "universe",
+              universe.subcategories,
               `/dashboard/universes/${universe.id}/map`,
               `Relationship Map for ${universe.name}`,
             )}
@@ -1014,11 +1248,11 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                 }
               : undefined
           }
-          onDuplicateAsAu={
-            contextMenu.type === "document" &&
-            (contextMenu.docType === "CHARACTER" || contextMenu.docType === "WORLDBUILDING") &&
-            contextMenu.meta?.isCanon === true
-              ? () => void handleDuplicateAsAu()
+          // TODO: AU vs Canon feature — re-enable onDuplicateAsAu when the full workflow is ready.
+          onDuplicateAsAu={undefined}
+          onSetSubcategory={
+            contextMenu.type === "document" && contextMenu.availableSubcategories !== undefined
+              ? (subcategoryId) => void handleSetSubcategory(contextMenu.id, subcategoryId)
               : undefined
           }
           onCheckContradictions={

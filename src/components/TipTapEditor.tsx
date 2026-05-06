@@ -100,7 +100,7 @@ function Toolbar({
     <div
       role="toolbar"
       aria-label="Formatting toolbar"
-      className="flex flex-wrap items-center gap-0.5 border-b border-border bg-surface px-3 py-1.5"
+      className="sticky top-0 z-10 flex flex-wrap items-center gap-0.5 border-b border-border bg-surface px-3 py-1.5"
     >
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}

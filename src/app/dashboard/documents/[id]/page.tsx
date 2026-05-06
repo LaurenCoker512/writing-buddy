@@ -5,6 +5,12 @@ import DocumentWorkspace from "./DocumentWorkspace";
 
 type Props = { params: { id: string } };
 
+function parseTiptapJson(raw: unknown): object {
+  return raw !== null && typeof raw === "object" && !Array.isArray(raw)
+    ? (raw as object)
+    : { type: "doc", content: [] };
+}
+
 export default async function DocumentPage({ params }: Props) {
   const session = await auth();
   if (!session?.user?.id) redirect("/signin");
@@ -15,7 +21,26 @@ export default async function DocumentPage({ params }: Props) {
       story: { select: { userId: true, universeId: true, seriesId: true } },
       series: { select: { userId: true, universeId: true } },
       universe: { select: { userId: true } },
-      parent: { select: { id: true, name: true } },
+      parent: {
+        select: {
+          id: true,
+          name: true,
+          tiptapJson: true,
+          storyId: true,
+          seriesId: true,
+          universeId: true,
+          parent: {
+            select: {
+              id: true,
+              name: true,
+              tiptapJson: true,
+              storyId: true,
+              seriesId: true,
+              universeId: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -25,10 +50,7 @@ export default async function DocumentPage({ params }: Props) {
     document.story?.userId ?? document.series?.userId ?? document.universe?.userId;
   if (ownerId !== session.user.id) notFound();
 
-  const tiptapJson =
-    document.tiptapJson !== null && typeof document.tiptapJson === "object"
-      ? (document.tiptapJson as object)
-      : { type: "doc", content: [] };
+  const tiptapJson = parseTiptapJson(document.tiptapJson);
 
   const initialMeta =
     document.meta !== null &&
@@ -37,22 +59,72 @@ export default async function DocumentPage({ params }: Props) {
       ? (document.meta as Record<string, unknown>)
       : null;
 
-  // Resolve the universe that owns this document (for specialization candidates)
   const universeId =
     document.universeId ??
     document.story?.universeId ??
     document.series?.universeId ??
     null;
 
-  // Fetch universe-level documents of the same type as parent candidates,
-  // but only when the current document is story-scoped (specialization is story→universe)
-  let parentCandidates: { id: string; name: string }[] = [];
-  if (document.storyId !== null && universeId !== null) {
-    parentCandidates = await prisma.document.findMany({
-      where: { universeId, type: document.type },
+  // Build parent view chain for the scope-switcher tabs.
+  // Each entry is a higher-level document the user can read (but not edit).
+  type ParentView = { id: string; name: string; tiptapJson: object; label: string };
+  const parentViews: ParentView[] = [];
+
+  if (document.parent) {
+    const p = document.parent;
+    const pLabel =
+      p.storyId === null && p.seriesId !== null ? "Series"
+      : p.storyId === null && p.seriesId === null ? "Full Universe"
+      : "Parent";
+    parentViews.push({ id: p.id, name: p.name, tiptapJson: parseTiptapJson(p.tiptapJson), label: pLabel });
+
+    if (p.parent) {
+      const gp = p.parent;
+      parentViews.push({
+        id: gp.id,
+        name: gp.name,
+        tiptapJson: parseTiptapJson(gp.tiptapJson),
+        label: "Full Universe",
+      });
+    }
+  }
+
+  const currentLabel =
+    document.storyId !== null ? "This Story"
+    : document.seriesId !== null ? "This Series"
+    : "This Universe";
+
+  // Parent candidates for the specialization selector.
+  // Story-scoped: series-level docs in the same series + universe-level docs.
+  // Series-scoped: universe-level docs.
+  type ParentCandidate = { id: string; name: string; scopeLabel: string };
+  let parentCandidates: ParentCandidate[] = [];
+
+  if (document.storyId !== null) {
+    const storySeriesId = document.story?.seriesId ?? null;
+    if (storySeriesId !== null) {
+      const seriesDocs = await prisma.document.findMany({
+        where: { seriesId: storySeriesId, storyId: null, type: document.type },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      });
+      parentCandidates = seriesDocs.map((d) => ({ ...d, scopeLabel: "Series" }));
+    }
+    if (universeId !== null) {
+      const universeDocs = await prisma.document.findMany({
+        where: { universeId, storyId: null, seriesId: null, type: document.type },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      });
+      parentCandidates = [...parentCandidates, ...universeDocs.map((d) => ({ ...d, scopeLabel: "Universe" }))];
+    }
+  } else if (document.seriesId !== null && universeId !== null) {
+    const universeDocs = await prisma.document.findMany({
+      where: { universeId, storyId: null, seriesId: null, type: document.type },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     });
+    parentCandidates = universeDocs.map((d) => ({ ...d, scopeLabel: "Universe" }));
   }
 
   return (
@@ -68,6 +140,8 @@ export default async function DocumentPage({ params }: Props) {
       parentDocumentId={document.parentDocumentId}
       parentDocumentName={document.parent?.name ?? null}
       parentCandidates={parentCandidates}
+      parentViews={parentViews}
+      currentLabel={currentLabel}
     />
   );
 }

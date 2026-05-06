@@ -157,6 +157,11 @@ export function DeleteModal({
             &ldquo;{modal.name}&rdquo; will be permanently deleted along with
             its versions and chat history.
           </>
+        ) : modal.type === "subcategory" ? (
+          <>
+            &ldquo;{modal.name}&rdquo; will be deleted. Documents in this
+            subcategory will become uncategorized.
+          </>
         ) : (
           <>
             &ldquo;{modal.name}&rdquo; will be permanently deleted. Children

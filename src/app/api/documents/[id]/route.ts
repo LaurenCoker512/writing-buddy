@@ -34,6 +34,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams<{ id: stri
     name?: string;
     order?: number | null;
     parentDocumentId?: string | null;
+    subcategoryId?: string | null;
     tiptapJson?: Prisma.InputJsonValue;
     meta?: Prisma.InputJsonValue;
   } = {};
@@ -50,6 +51,10 @@ export async function PATCH(req: NextRequest, { params }: RouteParams<{ id: stri
   if (body.parentDocumentId !== undefined) {
     data.parentDocumentId =
       typeof body.parentDocumentId === "string" ? body.parentDocumentId : null;
+  }
+  if (body.subcategoryId !== undefined) {
+    data.subcategoryId =
+      typeof body.subcategoryId === "string" ? body.subcategoryId : null;
   }
   if (body.tiptapJson !== undefined && typeof body.tiptapJson === "object" && body.tiptapJson !== null) {
     data.tiptapJson = body.tiptapJson as Prisma.InputJsonValue;

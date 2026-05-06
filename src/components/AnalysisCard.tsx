@@ -1,20 +1,31 @@
 "use client";
 
 import type { AnalysisSection } from "@/types/analysis";
+import { TrashIcon } from "@/components/icons";
 
 interface AnalysisCardProps {
   sections: AnalysisSection[];
+  onDismiss?: () => void;
 }
 
-export default function AnalysisCard({ sections }: AnalysisCardProps) {
+export default function AnalysisCard({ sections, onDismiss }: AnalysisCardProps) {
   return (
     <div
-      className="overflow-hidden rounded-lg border border-border bg-surface text-sm"
+      className="group overflow-hidden rounded-lg border border-border bg-surface text-sm"
       role="region"
       aria-label="Analysis results"
     >
-      <div className="border-b border-border bg-surface px-4 py-2">
+      <div className="flex items-center justify-between border-b border-border bg-surface px-4 py-2">
         <span className="text-xs font-semibold text-text-muted">Analysis</span>
+        {onDismiss && (
+          <button
+            onClick={onDismiss}
+            className="invisible rounded p-1 text-text-muted transition-colors hover:bg-background hover:text-red-500 group-hover:visible"
+            aria-label="Delete analysis"
+          >
+            <TrashIcon className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
       <div className="px-4 py-3">
         {sections.map((section, index) => (
