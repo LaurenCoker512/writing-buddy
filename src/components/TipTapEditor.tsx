@@ -321,7 +321,7 @@ export default function TipTapEditor({
     editor.commands.setContent(externalContent.json);
     if (contentRef !== undefined) contentRef.current = externalContent.json;
     autosaveRef.current.trigger(externalContent.json);
-  }, [editor, externalContent]);
+  }, [editor, externalContent, contentRef]);
 
   return (
     <div className="flex flex-col">

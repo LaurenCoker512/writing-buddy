@@ -94,7 +94,6 @@ function ContextMenuDropdown({
   onDelete,
   onClose,
   onImportCanon,
-  onDuplicateAsAu,
   onCheckContradictions,
   onSetSubcategory,
 }: {
@@ -103,7 +102,6 @@ function ContextMenuDropdown({
   onDelete: () => void;
   onClose: () => void;
   onImportCanon?: () => void;
-  onDuplicateAsAu?: () => void;
   onCheckContradictions?: () => void;
   onSetSubcategory?: (subcategoryId: string | null) => void;
 }) {
@@ -520,15 +518,6 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     if (shouldRedirect) {
       router.push("/dashboard");
     }
-  };
-
-  const handleDuplicateAsAu = async () => {
-    if (!contextMenu) return;
-    const res = await fetch(`/api/documents/${contextMenu.id}/duplicate`, {
-      method: "POST",
-    });
-    setContextMenu(null);
-    if (res.ok) void fetchTree();
   };
 
   const handleCreate = async (data: CreateData) => {
@@ -1248,8 +1237,6 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                 }
               : undefined
           }
-          // TODO: AU vs Canon feature — re-enable onDuplicateAsAu when the full workflow is ready.
-          onDuplicateAsAu={undefined}
           onSetSubcategory={
             contextMenu.type === "document" && contextMenu.availableSubcategories !== undefined
               ? (subcategoryId) => void handleSetSubcategory(contextMenu.id, subcategoryId)

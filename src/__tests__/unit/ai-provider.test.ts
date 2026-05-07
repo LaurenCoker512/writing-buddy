@@ -3,7 +3,7 @@ jest.mock("@anthropic-ai/sdk", () => {
   const mockCreate = jest.fn();
   class MockAnthropic {
     messages = { stream: mockStream, create: mockCreate };
-    constructor(_opts: unknown) {}
+    constructor() {}
   }
   return {
     __esModule: true,

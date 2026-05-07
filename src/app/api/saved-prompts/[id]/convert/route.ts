@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 import { isRating } from "@/lib/hierarchy";
 import { buildBrainstormTemplateWithPrompt } from "@/lib/document-templates";
 import { AI_CONFIG } from "@/config/ai";

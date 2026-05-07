@@ -9,7 +9,6 @@ jest.mock("@/lib/prisma", () => ({
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
-import { NextRequest } from "next/server";
 import { PATCH } from "@/app/api/settings/api-key/route";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";

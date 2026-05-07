@@ -43,3 +43,9 @@ yarn-error.log*
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Docs
+DEPLOYMENT.md
+BUG_BASH.md
+FUTURE_FEATURES.md
+TESTING_GAPS.md
