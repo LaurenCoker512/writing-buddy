@@ -1,4 +1,4 @@
-export type TipTapMark = { type: string };
+export type TipTapMark = { type: string; attrs?: Record<string, unknown> };
 
 export type TipTapNode = {
   type: string;
