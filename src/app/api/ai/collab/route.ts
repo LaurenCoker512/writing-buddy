@@ -108,6 +108,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const userId = session.user.id;
+
   const body = (await req.json()) as {
     documentId?: unknown;
     content?: unknown;
@@ -128,7 +130,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Message too long" }, { status: 400 });
   }
 
-  const document = await findOwnedDocument(body.documentId, session.user.id);
+  const document = await findOwnedDocument(body.documentId, userId);
   if (!document) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -136,8 +138,8 @@ export async function POST(req: NextRequest) {
   const owner = (document.story ?? document.series ?? document.universe)!;
 
   const [providerResult, userSettings] = await Promise.all([
-    resolveProviderForUser(session.user.id),
-    prisma.user.findUnique({ where: { id: session.user.id }, select: { explicitEnabled: true } }),
+    resolveProviderForUser(userId),
+    prisma.user.findUnique({ where: { id: userId }, select: { explicitEnabled: true } }),
   ]);
 
   if (!providerResult.ok) {
@@ -157,7 +159,7 @@ export async function POST(req: NextRequest) {
   const additionalDocs =
     additionalDocIds.length > 0
       ? await Promise.all(
-          additionalDocIds.map((id) => findOwnedDocument(id, session.user.id)),
+          additionalDocIds.map((id) => findOwnedDocument(id, userId)),
         ).then((docs) => docs.filter((d) => d !== null))
       : [];
 

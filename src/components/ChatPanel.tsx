@@ -2,27 +2,25 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import DiffCard from "@/components/DiffCard";
-import AnalysisCard from "@/components/AnalysisCard";
 import type { DiffProposal } from "@/types/diff";
-import type { AnalysisSection } from "@/types/analysis";
 import { parseInlineBadges } from "@/lib/canon-badge";
+import { DOCUMENT_TYPE_LABELS } from "@/lib/documents";
+import { detectEditIntent } from "@/lib/collab-intent";
 import { TrashIcon } from "@/components/icons";
 
-type PanelMode = "chat" | "edit" | "analyze";
+type CollabContextDoc = { id: string; name: string; type: string };
 
-type ChatMessage = { kind: "message"; key: string; id?: string; role: "user" | "assistant"; content: string; mode: PanelMode };
-type DiffItem = { kind: "diff"; key: string; proposal: DiffProposal; mode: PanelMode };
-type AnalysisItem = { kind: "analysis"; key: string; sections: AnalysisSection[]; mode: PanelMode };
-type ChatItem = ChatMessage | DiffItem | AnalysisItem;
+type ChatMessage = { kind: "message"; key: string; id?: string; role: "user" | "assistant"; content: string };
+type ChatItem = ChatMessage;
 
-const ANALYZE_PREVIEW_LENGTH = 200;
 const MESSAGE_COLLAPSE_THRESHOLD = 400;
 
 interface ChatPanelProps {
   documentId: string;
-  onAcceptDiff: (proposal: DiffProposal) => Promise<void>;
-  initialDiffProposals?: DiffProposal[];
+  storyId: string | null;
+  seriesId: string | null;
+  universeId: string | null;
+  onDiffProposals: (proposals: DiffProposal[]) => void;
 }
 
 function ThinkingSpinner() {
@@ -70,18 +68,25 @@ function AssistantMessageContent({ content }: { content: string }) {
   );
 }
 
-export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposals }: ChatPanelProps) {
+export default function ChatPanel({
+  documentId,
+  storyId,
+  seriesId,
+  universeId,
+  onDiffProposals,
+}: ChatPanelProps) {
   const [items, setItems] = useState<ChatItem[]>([]);
   const [chatSummary, setChatSummary] = useState<string | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [isRequestingDiff, setIsRequestingDiff] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [mode, setMode] = useState<PanelMode>("chat");
   const [noApiKey, setNoApiKey] = useState(false);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+  const [contextDocs, setContextDocs] = useState<CollabContextDoc[]>([]);
+  const [availableDocs, setAvailableDocs] = useState<CollabContextDoc[]>([]);
+  const [showDocPicker, setShowDocPicker] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
   const keyCounter = useRef(0);
 
   function nextKey() {
@@ -97,6 +102,7 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
     });
   }
 
+  // Load chat history
   useEffect(() => {
     async function loadHistory() {
       try {
@@ -110,14 +116,8 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
             .filter((m): m is { id: string; role: "user" | "assistant"; content: string } =>
               m.role === "user" || m.role === "assistant",
             )
-            .map((m) => ({ kind: "message", key: nextKey(), id: m.id, role: m.role, content: m.content, mode: "chat" as PanelMode }));
-          const pendingDiffs: ChatItem[] = (initialDiffProposals ?? []).map((proposal) => ({
-            kind: "diff",
-            key: nextKey(),
-            proposal,
-            mode: "edit" as PanelMode,
-          }));
-          setItems([...loaded, ...pendingDiffs]);
+            .map((m) => ({ kind: "message", key: nextKey(), id: m.id, role: m.role, content: m.content }));
+          setItems(loaded);
           setChatSummary(data.chatSummary);
         }
       } finally {
@@ -128,30 +128,78 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentId]);
 
+  // Fetch available context docs from most specific scope
+  useEffect(() => {
+    const scopeParam = storyId
+      ? `storyId=${storyId}`
+      : seriesId
+        ? `seriesId=${seriesId}`
+        : universeId
+          ? `universeId=${universeId}`
+          : null;
+
+    if (!scopeParam) return;
+
+    fetch(`/api/documents?${scopeParam}`)
+      .then(async (res) => {
+        if (!res.ok) return;
+        const docs = (await res.json()) as Array<{ id: string; name: string; type: string }>;
+        setAvailableDocs(docs.filter((d) => d.id !== documentId));
+      })
+      .catch(() => undefined);
+  }, [documentId, storyId, seriesId, universeId]);
+
+  // Close doc picker on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
+        setShowDocPicker(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [items]);
 
+  function addContextDoc(doc: CollabContextDoc) {
+    setContextDocs((prev) => (prev.some((d) => d.id === doc.id) ? prev : [...prev, doc]));
+    setShowDocPicker(false);
+  }
+
+  function removeContextDoc(docId: string) {
+    setContextDocs((prev) => prev.filter((d) => d.id !== docId));
+  }
+
   async function sendMessage() {
     const content = input.trim();
-    if (!content || isStreaming || isRequestingDiff) return;
+    if (!content || isStreaming) return;
 
+    const responseType = detectEditIntent(content);
     const userKey = nextKey();
     const assistantKey = nextKey();
+
     setItems((prev) => [
       ...prev,
-      { kind: "message", key: userKey, role: "user", content, mode: "chat" },
-      { kind: "message", key: assistantKey, role: "assistant", content: "", mode: "chat" },
+      { kind: "message", key: userKey, role: "user", content },
+      { kind: "message", key: assistantKey, role: "assistant", content: "" },
     ]);
     setInput("");
     setIsStreaming(true);
     setNoApiKey(false);
 
     try {
-      const response = await fetch("/api/ai/chat", {
+      const response = await fetch("/api/ai/collab", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ documentId, content }),
+        body: JSON.stringify({
+          documentId,
+          content,
+          additionalDocumentIds: contextDocs.map((d) => d.id),
+          responseType,
+        }),
       });
 
       if (response.status === 402) {
@@ -160,7 +208,7 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
         return;
       }
 
-      if (!response.ok || !response.body) {
+      if (!response.ok) {
         setItems((prev) =>
           prev.map((item) =>
             item.key === assistantKey
@@ -171,6 +219,27 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
         return;
       }
 
+      if (responseType === "edit") {
+        const data = (await response.json()) as { proposals?: DiffProposal[] };
+        const proposals = data.proposals ?? [];
+
+        const assistantMsg =
+          proposals.length > 0
+            ? "Proposed edits are shown in the editor. Review and accept or reject each change."
+            : "No edit proposals were generated. Try rephrasing your instruction.";
+
+        setItems((prev) =>
+          prev.map((item) => (item.key === assistantKey ? { ...item, content: assistantMsg } : item)),
+        );
+
+        if (proposals.length > 0) {
+          onDiffProposals(proposals);
+        }
+        return;
+      }
+
+      // responseType === "chat" — stream SSE
+      if (!response.body) return;
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let assistantContent = "";
@@ -216,178 +285,6 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
     }
   }
 
-  async function requestEdit() {
-    const instruction = input.trim();
-    if (!instruction || isStreaming || isRequestingDiff) return;
-
-    setInput("");
-    setIsRequestingDiff(true);
-    setNoApiKey(false);
-
-    const userKey = nextKey();
-    setItems((prev) => [
-      ...prev,
-      { kind: "message", key: userKey, role: "user", content: `[Edit request] ${instruction}`, mode: "edit" },
-    ]);
-
-    try {
-      const response = await fetch("/api/ai/diff", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ documentId, instruction }),
-      });
-
-      if (response.status === 402) {
-        setNoApiKey(true);
-        setItems((prev) => prev.filter((item) => item.key !== userKey));
-        return;
-      }
-
-      if (!response.ok) {
-        setItems((prev) => [
-          ...prev,
-          {
-            kind: "message",
-            key: nextKey(),
-            role: "assistant",
-            content: "Could not generate edit proposals. Please try again.",
-            mode: "edit",
-          },
-        ]);
-        return;
-      }
-
-      const data = (await response.json()) as { proposals?: DiffProposal[] };
-      const proposals = data.proposals ?? [];
-
-      if (proposals.length === 0) {
-        setItems((prev) => [
-          ...prev,
-          {
-            kind: "message",
-            key: nextKey(),
-            role: "assistant",
-            content: "No edit proposals were generated. Try rephrasing your instruction.",
-            mode: "edit",
-          },
-        ]);
-        return;
-      }
-
-      setItems((prev) => [
-        ...prev,
-        ...proposals.map(
-          (proposal): DiffItem => ({ kind: "diff", key: nextKey(), proposal, mode: "edit" }),
-        ),
-      ]);
-    } catch {
-      setItems((prev) => [
-        ...prev,
-        {
-          kind: "message",
-          key: nextKey(),
-          role: "assistant",
-          content: "Something went wrong. Please try again.",
-          mode: "edit",
-        },
-      ]);
-    } finally {
-      setIsRequestingDiff(false);
-    }
-  }
-
-  async function requestAnalysis() {
-    const content = input.trim();
-    if (!content || isStreaming || isRequestingDiff || isAnalyzing) return;
-
-    setInput("");
-    setIsAnalyzing(true);
-    setNoApiKey(false);
-
-    const preview =
-      content.length > ANALYZE_PREVIEW_LENGTH
-        ? `${content.slice(0, ANALYZE_PREVIEW_LENGTH)}… [+${content.length - ANALYZE_PREVIEW_LENGTH} chars]`
-        : content;
-
-    const userKey = nextKey();
-    setItems((prev) => [
-      ...prev,
-      { kind: "message", key: userKey, role: "user", content: `[Analyze] ${preview}`, mode: "analyze" },
-    ]);
-
-    try {
-      const response = await fetch("/api/ai/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ documentId, content }),
-      });
-
-      if (response.status === 402) {
-        setNoApiKey(true);
-        setItems((prev) => prev.filter((item) => item.key !== userKey));
-        return;
-      }
-
-      if (!response.ok) {
-        setItems((prev) => [
-          ...prev,
-          {
-            kind: "message",
-            key: nextKey(),
-            role: "assistant",
-            content: "Could not analyze content. Please try again.",
-            mode: "analyze",
-          },
-        ]);
-        return;
-      }
-
-      const data = (await response.json()) as { sections?: AnalysisSection[] };
-      const sections = data.sections ?? [];
-
-      if (sections.length === 0) {
-        setItems((prev) => [
-          ...prev,
-          {
-            kind: "message",
-            key: nextKey(),
-            role: "assistant",
-            content: "No relevant details were found for this document. Try a different excerpt.",
-            mode: "analyze",
-          },
-        ]);
-        return;
-      }
-
-      setItems((prev) => [
-        ...prev,
-        { kind: "analysis", key: nextKey(), sections, mode: "analyze" },
-      ]);
-    } catch {
-      setItems((prev) => [
-        ...prev,
-        {
-          kind: "message",
-          key: nextKey(),
-          role: "assistant",
-          content: "Something went wrong. Please try again.",
-          mode: "analyze",
-        },
-      ]);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }
-
-  async function handleAccept(proposal: DiffProposal) {
-    setItems((prev) => prev.filter((item) => !(item.kind === "diff" && item.proposal.id === proposal.id)));
-    await onAcceptDiff(proposal);
-  }
-
-  function handleReject(proposalId: string) {
-    setItems((prev) => prev.filter((item) => !(item.kind === "diff" && item.proposal.id === proposalId)));
-  }
-
   async function deleteItem(itemKey: string, messageId?: string) {
     if (messageId) {
       await fetch(`/api/documents/${documentId}/messages/${messageId}`, { method: "DELETE" });
@@ -395,32 +292,15 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
     setItems((prev) => prev.filter((item) => item.key !== itemKey));
   }
 
-  const isBusy = isStreaming || isRequestingDiff || isAnalyzing;
-  const displayItems = items.filter((item) => item.mode === mode);
+  const pickerCandidates = availableDocs.filter((doc) => !contextDocs.some((c) => c.id === doc.id));
 
   return (
     <div className="flex h-full flex-col">
       <div className="shrink-0 border-b border-border bg-surface px-6 py-4">
-        <div className="flex items-center justify-between">
-          <h2 className="flex items-center gap-2 font-heading text-lg font-semibold text-text-primary">
-            <span className="text-accent-ai" aria-hidden="true">✦</span>
-            AI Chat
-          </h2>
-          <div className="flex rounded-lg border border-border text-xs font-medium overflow-hidden">
-            {(["chat", "edit", "analyze"] as PanelMode[]).map((m) => (
-              <button
-                key={m}
-                onClick={() => setMode(m)}
-                className={`px-3 py-1.5 capitalize transition-colors ${
-                  mode === m ? "bg-accent text-white" : "text-text-muted hover:text-text-primary"
-                }`}
-                aria-pressed={mode === m}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
-        </div>
+        <h2 className="flex items-center gap-2 font-heading text-lg font-semibold text-text-primary">
+          <span className="text-accent-ai" aria-hidden="true">✦</span>
+          Collab
+        </h2>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
@@ -428,13 +308,9 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
           <p className="py-8 text-center text-sm text-text-muted">Loading chat history…</p>
         )}
 
-        {!isLoadingHistory && displayItems.length === 0 && !noApiKey && (
+        {!isLoadingHistory && items.length === 0 && !noApiKey && (
           <p className="py-8 text-center text-sm text-text-muted">
-            {mode === "edit"
-              ? "Describe the edits you want to make to your document."
-              : mode === "analyze"
-                ? "Paste a scene, transcript, or summary to extract details for this document."
-                : "Ask me anything about your document."}
+            Ask a question or give an edit instruction.
           </p>
         )}
 
@@ -453,34 +329,13 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
 
         {!isLoadingHistory && (
           <div className="flex flex-col gap-4">
-            {mode === "chat" && chatSummary !== null && (
+            {chatSummary !== null && (
               <p className="text-center text-xs italic text-text-muted">
                 Earlier conversation has been summarized.
               </p>
             )}
-            {displayItems.map((item, index) => {
-              if (item.kind === "analysis") {
-                return (
-                  <AnalysisCard
-                    key={item.key}
-                    sections={item.sections}
-                    onDismiss={() => void deleteItem(item.key)}
-                  />
-                );
-              }
-
-              if (item.kind === "diff") {
-                return (
-                  <DiffCard
-                    key={item.key}
-                    proposal={item.proposal}
-                    onAccept={(proposal) => void handleAccept(proposal)}
-                    onReject={handleReject}
-                  />
-                );
-              }
-
-              const isLastStreaming = isStreaming && index === displayItems.length - 1;
+            {items.map((item, index) => {
+              const isLastStreaming = isStreaming && index === items.length - 1;
               const isLong = item.content.length > MESSAGE_COLLAPSE_THRESHOLD && !isLastStreaming;
               const isExpanded = expandedKeys.has(item.key);
               const deleteBtn = !isLastStreaming ? (
@@ -536,7 +391,7 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
                 </div>
               );
             })}
-            {((isRequestingDiff && mode === "edit") || (isAnalyzing && mode === "analyze")) && <ThinkingSpinner />}
+            {isStreaming && items.at(-1)?.content === "" && <ThinkingSpinner />}
           </div>
         )}
         <div ref={bottomRef} />
@@ -546,51 +401,84 @@ export default function ChatPanel({ documentId, onAcceptDiff, initialDiffProposa
         <div className="flex items-end gap-2">
           <textarea
             className="flex-1 resize-none rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent"
-            placeholder={
-              mode === "edit"
-                ? "Describe the edits you want…"
-                : mode === "analyze"
-                  ? "Paste a scene, transcript, or summary to analyze…"
-                  : "Ask anything about your document…"
-            }
-            rows={mode === "analyze" ? 4 : 2}
+            placeholder="Ask anything or give an edit instruction…"
+            rows={2}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && mode !== "analyze") {
+              if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                void (mode === "edit" ? requestEdit() : sendMessage());
+                void sendMessage();
               }
             }}
-            disabled={isBusy}
-            aria-label={
-              mode === "edit"
-                ? "Edit instruction input"
-                : mode === "analyze"
-                  ? "Content to analyze"
-                  : "Chat message input"
-            }
+            disabled={isStreaming}
+            aria-label="Message input"
           />
           <button
-            onClick={() =>
-              void (mode === "edit"
-                ? requestEdit()
-                : mode === "analyze"
-                  ? requestAnalysis()
-                  : sendMessage())
-            }
-            disabled={isBusy || !input.trim()}
+            onClick={() => void sendMessage()}
+            disabled={isStreaming || !input.trim()}
             className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label={
-              mode === "edit"
-                ? "Request edit"
-                : mode === "analyze"
-                  ? "Analyze content"
-                  : "Send message"
-            }
+            aria-label="Send message"
           >
-            {mode === "edit" ? "Edit" : mode === "analyze" ? "Analyze" : "Send"}
+            Send
           </button>
+        </div>
+
+        {/* Context chips */}
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <span className="flex items-center rounded-full border border-border bg-surface px-2.5 py-1 text-xs text-text-muted">
+            Current document
+          </span>
+
+          {contextDocs.map((doc) => {
+            const typeLabel = DOCUMENT_TYPE_LABELS[doc.type as keyof typeof DOCUMENT_TYPE_LABELS] ?? doc.type;
+            return (
+              <span
+                key={doc.id}
+                className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs text-text-primary"
+              >
+                <span className="text-text-muted">{typeLabel}</span>
+                {doc.name}
+                <button
+                  onClick={() => removeContextDoc(doc.id)}
+                  className="ml-0.5 leading-none text-text-muted hover:text-text-primary"
+                  aria-label={`Remove ${doc.name} from context`}
+                >
+                  ×
+                </button>
+              </span>
+            );
+          })}
+
+          {pickerCandidates.length > 0 && (
+            <div ref={pickerRef} className="relative">
+              <button
+                onClick={() => setShowDocPicker((prev) => !prev)}
+                className="rounded-full border border-dashed border-border px-2.5 py-1 text-xs text-text-muted transition-colors hover:text-text-primary"
+              >
+                + Add context
+              </button>
+
+              {showDocPicker && (
+                <div className="absolute bottom-full left-0 z-10 mb-1 max-h-48 w-56 overflow-y-auto rounded-lg border border-border bg-surface shadow-lg">
+                  {pickerCandidates.map((doc) => {
+                    const typeLabel =
+                      DOCUMENT_TYPE_LABELS[doc.type as keyof typeof DOCUMENT_TYPE_LABELS] ?? doc.type;
+                    return (
+                      <button
+                        key={doc.id}
+                        onClick={() => addContextDoc(doc)}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-background"
+                      >
+                        <span className="shrink-0 text-xs text-text-muted">{typeLabel}</span>
+                        <span className="truncate">{doc.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

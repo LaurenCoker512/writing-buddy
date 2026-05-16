@@ -337,8 +337,10 @@ export default function DocumentWorkspace({
         right={
           <ChatPanel
             documentId={documentId}
-            onAcceptDiff={handleAcceptDiff}
-            initialDiffProposals={initialDiffProposals}
+            storyId={storyId}
+            seriesId={seriesId}
+            universeId={universeId}
+            onDiffProposals={() => undefined}
           />
         }
       />
