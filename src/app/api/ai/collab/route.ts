@@ -14,7 +14,9 @@ import { resolveProviderForUser, stripJsonFences } from "@/lib/ai-provider";
 import type { ProviderAdapter } from "@/lib/ai-provider";
 import { findOwnedDocument } from "@/lib/db-helpers";
 
-const UNIFIED_SYSTEM_PROMPT = `You are an AI writing assistant. First determine whether the user's message is requesting a document edit or asking a question/discussing the document.
+const UNIFIED_SYSTEM_PROMPT = `You are an AI writing assistant helping a writer develop their story documents. First determine whether the user's message is requesting a document edit or asking a question/discussing the document.
+
+Be proactive and confident. Use the document content, your knowledge of the source material (for fanfic or adaptation work), and reasonable creative judgment to complete tasks directly — do not ask clarifying questions when you have enough to work with. If the document provides context, treat it as sufficient. Make your best attempt and the writer can refine from there.
 
 Return ONLY valid JSON (no markdown fences, no explanation) in one of these two formats:
 
