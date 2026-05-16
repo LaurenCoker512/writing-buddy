@@ -6,6 +6,7 @@ import type { DiffProposal } from "@/types/diff";
 import { parseInlineBadges } from "@/lib/canon-badge";
 import { DOCUMENT_TYPE_LABELS } from "@/lib/documents";
 import { TrashIcon } from "@/components/icons";
+import ContextPickerModal from "@/components/ContextPickerModal";
 
 type CollabContextDoc = { id: string; name: string; type: string };
 
@@ -82,10 +83,8 @@ export default function ChatPanel({
   const [noApiKey, setNoApiKey] = useState(false);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const [contextDocs, setContextDocs] = useState<CollabContextDoc[]>([]);
-  const [availableDocs, setAvailableDocs] = useState<CollabContextDoc[]>([]);
-  const [showDocPicker, setShowDocPicker] = useState(false);
+  const [showContextModal, setShowContextModal] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const pickerRef = useRef<HTMLDivElement>(null);
   const keyCounter = useRef(0);
 
   function nextKey() {
@@ -127,50 +126,9 @@ export default function ChatPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentId]);
 
-  // Fetch available context docs from most specific scope
-  useEffect(() => {
-    const scopeParam = storyId
-      ? `storyId=${storyId}`
-      : seriesId
-        ? `seriesId=${seriesId}`
-        : universeId
-          ? `universeId=${universeId}`
-          : null;
-
-    if (!scopeParam) return;
-
-    fetch(`/api/documents?${scopeParam}`)
-      .then(async (res) => {
-        if (!res.ok) return;
-        const docs = (await res.json()) as Array<{ id: string; name: string; type: string }>;
-        setAvailableDocs(docs.filter((d) => d.id !== documentId));
-      })
-      .catch(() => undefined);
-  }, [documentId, storyId, seriesId, universeId]);
-
-  // Close doc picker on outside click
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
-        setShowDocPicker(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [items]);
-
-  function addContextDoc(doc: CollabContextDoc) {
-    setContextDocs((prev) => (prev.some((d) => d.id === doc.id) ? prev : [...prev, doc]));
-    setShowDocPicker(false);
-  }
-
-  function removeContextDoc(docId: string) {
-    setContextDocs((prev) => prev.filter((d) => d.id !== docId));
-  }
 
   async function sendMessage() {
     const content = input.trim();
@@ -243,8 +201,6 @@ export default function ChatPanel({
     }
     setItems((prev) => prev.filter((item) => item.key !== itemKey));
   }
-
-  const pickerCandidates = availableDocs.filter((doc) => !contextDocs.some((c) => c.id === doc.id));
 
   return (
     <div className="flex h-full flex-col">
@@ -386,7 +342,7 @@ export default function ChatPanel({
                 <span className="text-text-muted">{typeLabel}</span>
                 {doc.name}
                 <button
-                  onClick={() => removeContextDoc(doc.id)}
+                  onClick={() => setContextDocs((prev) => prev.filter((d) => d.id !== doc.id))}
                   className="ml-0.5 leading-none text-text-muted hover:text-text-primary"
                   aria-label={`Remove ${doc.name} from context`}
                 >
@@ -396,37 +352,29 @@ export default function ChatPanel({
             );
           })}
 
-          {pickerCandidates.length > 0 && (
-            <div ref={pickerRef} className="relative">
-              <button
-                onClick={() => setShowDocPicker((prev) => !prev)}
-                className="rounded-full border border-dashed border-border px-2.5 py-1 text-xs text-text-muted transition-colors hover:text-text-primary"
-              >
-                + Add context
-              </button>
-
-              {showDocPicker && (
-                <div className="absolute bottom-full left-0 z-10 mb-1 max-h-48 w-56 overflow-y-auto rounded-lg border border-border bg-surface shadow-lg">
-                  {pickerCandidates.map((doc) => {
-                    const typeLabel =
-                      DOCUMENT_TYPE_LABELS[doc.type as keyof typeof DOCUMENT_TYPE_LABELS] ?? doc.type;
-                    return (
-                      <button
-                        key={doc.id}
-                        onClick={() => addContextDoc(doc)}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-background"
-                      >
-                        <span className="shrink-0 text-xs text-text-muted">{typeLabel}</span>
-                        <span className="truncate">{doc.name}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+          <button
+            onClick={() => setShowContextModal(true)}
+            className="rounded-full border border-dashed border-border px-2.5 py-1 text-xs text-text-muted transition-colors hover:text-text-primary"
+          >
+            + Add context
+          </button>
         </div>
       </div>
+
+      {showContextModal && (
+        <ContextPickerModal
+          documentId={documentId}
+          storyId={storyId}
+          seriesId={seriesId}
+          universeId={universeId}
+          initialSelectedIds={new Set(contextDocs.map((d) => d.id))}
+          onConfirm={(docs) => {
+            setContextDocs(docs);
+            setShowContextModal(false);
+          }}
+          onClose={() => setShowContextModal(false)}
+        />
+      )}
     </div>
   );
 }
