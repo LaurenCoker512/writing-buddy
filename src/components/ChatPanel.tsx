@@ -5,7 +5,6 @@ import Link from "next/link";
 import type { DiffProposal } from "@/types/diff";
 import { parseInlineBadges } from "@/lib/canon-badge";
 import { DOCUMENT_TYPE_LABELS } from "@/lib/documents";
-import { detectEditIntent } from "@/lib/collab-intent";
 import { TrashIcon } from "@/components/icons";
 
 type CollabContextDoc = { id: string; name: string; type: string };
@@ -177,15 +176,9 @@ export default function ChatPanel({
     const content = input.trim();
     if (!content || isStreaming) return;
 
-    const responseType = detectEditIntent(content);
     const userKey = nextKey();
-    const assistantKey = nextKey();
 
-    setItems((prev) => [
-      ...prev,
-      { kind: "message", key: userKey, role: "user", content },
-      { kind: "message", key: assistantKey, role: "assistant", content: "" },
-    ]);
+    setItems((prev) => [...prev, { kind: "message", key: userKey, role: "user", content }]);
     setInput("");
     setIsStreaming(true);
     setNoApiKey(false);
@@ -198,88 +191,47 @@ export default function ChatPanel({
           documentId,
           content,
           additionalDocumentIds: contextDocs.map((d) => d.id),
-          responseType,
         }),
       });
 
       if (response.status === 402) {
         setNoApiKey(true);
-        setItems((prev) => prev.filter((item) => item.key !== userKey && item.key !== assistantKey));
+        setItems((prev) => prev.filter((item) => item.key !== userKey));
         return;
       }
 
       if (!response.ok) {
-        setItems((prev) =>
-          prev.map((item) =>
-            item.key === assistantKey
-              ? { ...item, content: "Something went wrong. Please try again." }
-              : item,
-          ),
-        );
+        setItems((prev) => [
+          ...prev,
+          { kind: "message", key: nextKey(), role: "assistant", content: "Something went wrong. Please try again." },
+        ]);
         return;
       }
 
-      if (responseType === "edit") {
-        const data = (await response.json()) as { proposals?: DiffProposal[] };
-        const proposals = data.proposals ?? [];
+      const data = (await response.json()) as
+        | { intent: "edit"; proposals: DiffProposal[] }
+        | { intent: "chat"; message: string };
 
+      if (data.intent === "edit") {
         const assistantMsg =
-          proposals.length > 0
+          data.proposals.length > 0
             ? "Proposed edits are shown in the editor. Review and accept or reject each change."
             : "No edit proposals were generated. Try rephrasing your instruction.";
 
-        setItems((prev) =>
-          prev.map((item) => (item.key === assistantKey ? { ...item, content: assistantMsg } : item)),
-        );
+        setItems((prev) => [...prev, { kind: "message", key: nextKey(), role: "assistant", content: assistantMsg }]);
 
-        if (proposals.length > 0) {
-          onDiffProposals(proposals);
+        if (data.proposals.length > 0) {
+          onDiffProposals(data.proposals);
         }
         return;
       }
 
-      // responseType === "chat" — stream SSE
-      if (!response.body) return;
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let assistantContent = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        for (const line of chunk.split("\n")) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6).trim();
-          if (data === "[DONE]") break;
-
-          try {
-            const parsed = JSON.parse(data) as {
-              choices?: Array<{ delta?: { content?: string } }>;
-            };
-            const delta = parsed.choices?.[0]?.delta?.content ?? "";
-            if (delta) {
-              assistantContent += delta;
-              setItems((prev) =>
-                prev.map((item) =>
-                  item.key === assistantKey ? { ...item, content: assistantContent } : item,
-                ),
-              );
-            }
-          } catch {
-            // ignore malformed SSE lines
-          }
-        }
-      }
+      setItems((prev) => [...prev, { kind: "message", key: nextKey(), role: "assistant", content: data.message }]);
     } catch {
-      setItems((prev) =>
-        prev.map((item) =>
-          item.key === assistantKey
-            ? { ...item, content: "Something went wrong. Please try again." }
-            : item,
-        ),
-      );
+      setItems((prev) => [
+        ...prev,
+        { kind: "message", key: nextKey(), role: "assistant", content: "Something went wrong. Please try again." },
+      ]);
     } finally {
       setIsStreaming(false);
     }
@@ -335,10 +287,10 @@ export default function ChatPanel({
               </p>
             )}
             {items.map((item, index) => {
-              const isLastStreaming = isStreaming && index === items.length - 1;
-              const isLong = item.content.length > MESSAGE_COLLAPSE_THRESHOLD && !isLastStreaming;
+              const isLastItem = index === items.length - 1;
+              const isLong = item.content.length > MESSAGE_COLLAPSE_THRESHOLD;
               const isExpanded = expandedKeys.has(item.key);
-              const deleteBtn = !isLastStreaming ? (
+              const deleteBtn = !(isStreaming && isLastItem) ? (
                 <button
                   onClick={() => void deleteItem(item.key, item.id)}
                   className="invisible mt-1 shrink-0 rounded p-1 text-text-muted transition-colors hover:bg-background hover:text-red-500 group-hover:visible"
@@ -362,13 +314,7 @@ export default function ChatPanel({
                     }`}
                   >
                     <div className={isLong && !isExpanded ? "max-h-40 overflow-hidden" : undefined}>
-                      {isLastStreaming && !item.content ? (
-                        <span
-                          className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-text-muted border-t-transparent"
-                          aria-label="Waiting for response"
-                          role="status"
-                        />
-                      ) : item.role === "assistant" ? (
+                      {item.role === "assistant" ? (
                         <AssistantMessageContent content={item.content} />
                       ) : (
                         <p className="whitespace-pre-wrap">{item.content}</p>
@@ -391,7 +337,7 @@ export default function ChatPanel({
                 </div>
               );
             })}
-            {isStreaming && items.at(-1)?.content === "" && <ThinkingSpinner />}
+            {isStreaming && <ThinkingSpinner />}
           </div>
         )}
         <div ref={bottomRef} />
