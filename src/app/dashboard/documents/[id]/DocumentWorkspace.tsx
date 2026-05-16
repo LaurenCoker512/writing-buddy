@@ -11,9 +11,6 @@ import DocumentMetaBar from "@/components/DocumentMetaBar";
 import DocumentLinksBar from "@/components/DocumentLinksBar";
 import ContradictionCheckerModal from "@/components/ContradictionCheckerModal";
 import ReadOnlyEditor from "@/components/ReadOnlyEditor";
-import { replaceSectionInTipTap, appendSectionToTipTap } from "@/lib/section-utils";
-import type { TipTapDoc } from "@/lib/section-utils";
-import { markdownToTipTapNodes } from "@/lib/markdown-to-tiptap";
 import type { DiffProposal } from "@/types/diff";
 import { consumePrepopulateProposals } from "@/lib/prepopulate-store";
 
@@ -78,38 +75,26 @@ export default function DocumentWorkspace({
   const [showParentSelector, setShowParentSelector] = useState(false);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const activeView = parentViews.find((v) => v.id === activeViewId) ?? null;
-  const [initialDiffProposals] = useState<DiffProposal[]>(() =>
+  const [pendingDiffs, setPendingDiffs] = useState<DiffProposal[]>(() =>
     consumePrepopulateProposals(documentId),
   );
   const editorContentRef = useRef<object>(initialJson);
 
   const typeLabel = DOCUMENT_TYPE_LABELS[documentType as DocumentTypeValue] ?? documentType;
 
-  async function handleAcceptDiff(proposal: DiffProposal) {
-    const currentDoc = editorContentRef.current as TipTapDoc;
+  function handleDiffProposals(proposals: DiffProposal[]) {
+    setPendingDiffs(proposals);
+  }
 
-    const newNodes = markdownToTipTapNodes(proposal.newMarkdown);
-    let newDoc: TipTapDoc;
-    if (proposal.isNew || proposal.heading === null) {
-      newDoc = appendSectionToTipTap(currentDoc, newNodes);
-    } else {
-      newDoc = replaceSectionInTipTap(currentDoc, proposal.heading, newNodes);
-    }
+  async function handleResolveDiff(proposalId: string, accept: boolean) {
+    setPendingDiffs((prev) => prev.filter((p) => p.id !== proposalId));
 
-    await fetch(`/api/documents/${documentId}/versions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tiptapJson: currentDoc }),
-    });
-
-    const patchRes = await fetch(`/api/documents/${documentId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tiptapJson: newDoc }),
-    });
-
-    if (patchRes.ok) {
-      setExternalContent({ json: newDoc, nonce: Date.now() });
+    if (accept) {
+      await fetch(`/api/documents/${documentId}/versions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tiptapJson: editorContentRef.current }),
+      });
       setVersionKey((k) => k + 1);
     }
   }
@@ -312,6 +297,8 @@ export default function DocumentWorkspace({
           onSaveStatusChange={setSaveStatus}
           externalContent={externalContent}
           contentRef={editorContentRef}
+          pendingDiffs={pendingDiffs}
+          onResolveDiff={handleResolveDiff}
         />
       </div>
 
@@ -340,7 +327,7 @@ export default function DocumentWorkspace({
             storyId={storyId}
             seriesId={seriesId}
             universeId={universeId}
-            onDiffProposals={() => undefined}
+            onDiffProposals={handleDiffProposals}
           />
         }
       />

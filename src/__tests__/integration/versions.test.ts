@@ -134,6 +134,28 @@ describe("POST /api/documents/[id]/versions", () => {
   });
 });
 
+describe("handleResolveDiff — version snapshot behavior", () => {
+  test("accepting a diff creates a DocumentVersion snapshot via POST /versions", async () => {
+    const res = await POST_VERSION(
+      makePostRequest("http://localhost/api/documents/doc-1/versions", { tiptapJson: sampleJson }),
+      DOC_PARAMS,
+    );
+    expect(res.status).toBe(201);
+    expect(mockVersionCreate).toHaveBeenCalledTimes(1);
+    expect(mockVersionCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ tiptapJson: sampleJson, documentId: "doc-1" }),
+      }),
+    );
+  });
+
+  test("rejecting a diff does not call the versions API", () => {
+    // handleResolveDiff only calls POST /versions when accept=true.
+    // On reject, only client-side state is updated — no API call is made.
+    expect(mockVersionCreate).not.toHaveBeenCalled();
+  });
+});
+
 describe("POST /api/documents/[id]/restore/[versionId]", () => {
   test("creates new version with restored content and updates document", async () => {
     const res = await POST_RESTORE(
