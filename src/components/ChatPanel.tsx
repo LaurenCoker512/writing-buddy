@@ -251,7 +251,7 @@ export default function ChatPanel({
       <div className="shrink-0 border-b border-border bg-surface px-6 py-4">
         <h2 className="flex items-center gap-2 font-heading text-lg font-semibold text-text-primary">
           <span className="text-accent-ai" aria-hidden="true">✦</span>
-          Collab
+          AI Collab
         </h2>
       </div>
 
