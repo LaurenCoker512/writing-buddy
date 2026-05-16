@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useEditor, useEditorState, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -12,6 +12,9 @@ import { createAutosave, type PatchFn } from "@/lib/autosave";
 import { tiptapToMarkdown } from "@/lib/tiptap-to-markdown";
 import type { TipTapNode } from "@/lib/tiptap-to-markdown";
 import { toSafeFilename } from "@/lib/export";
+import { TrackedInsert, TrackedDelete } from "@/lib/tiptap-tracked-changes";
+import { applyTrackedChangesToEditor, resolveTrackedChanges } from "@/lib/diff-to-tiptap";
+import type { DiffProposal } from "@/types/diff";
 
 // ── Toolbar ───────────────────────────────────────────────────────────────────
 
@@ -259,6 +262,8 @@ interface TipTapEditorProps {
   patchFn?: PatchFn;
   externalContent?: { json: object; nonce: number };
   contentRef?: React.MutableRefObject<object>;
+  pendingDiffs?: DiffProposal[];
+  onResolveDiff?: (proposalId: string, accept: boolean) => void;
 }
 
 export default function TipTapEditor({
@@ -270,6 +275,8 @@ export default function TipTapEditor({
   patchFn = defaultPatchFn,
   externalContent,
   contentRef,
+  pendingDiffs = [],
+  onResolveDiff,
 }: TipTapEditorProps) {
   const autosaveRef = useRef(
     createAutosave(documentId, AUTOSAVE_DELAY_MS, async (id, json) => {
@@ -286,6 +293,15 @@ export default function TipTapEditor({
   }, []);
 
   const appliedNonceRef = useRef(0);
+  const pendingDiffsRef = useRef(pendingDiffs);
+  const appliedProposalIdsRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    pendingDiffsRef.current = pendingDiffs;
+  }, [pendingDiffs]);
+
+  const [activeProposalId, setActiveProposalId] = useState<string | null>(null);
+  const [toolbarAnchor, setToolbarAnchor] = useState<{ top: number; left: number } | null>(null);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -296,12 +312,29 @@ export default function TipTapEditor({
       TableRow,
       TableHeader,
       TableCell,
+      TrackedInsert,
+      TrackedDelete,
     ],
     content: initialJson,
     onUpdate({ editor: ed }) {
       const json = ed.getJSON();
       if (contentRef !== undefined) contentRef.current = json;
-      autosaveRef.current.trigger(json);
+      if (pendingDiffsRef.current.length === 0) {
+        autosaveRef.current.trigger(json);
+      }
+    },
+    onSelectionUpdate({ editor: ed }) {
+      const insertAttrs = ed.getAttributes("trackedInsert");
+      const deleteAttrs = ed.getAttributes("trackedDelete");
+      const rawId = insertAttrs["proposalId"] ?? deleteAttrs["proposalId"];
+      const proposalId = typeof rawId === "string" ? rawId : null;
+      setActiveProposalId(proposalId);
+      if (proposalId !== null) {
+        const coords = ed.view.coordsAtPos(ed.state.selection.from);
+        setToolbarAnchor({ top: coords.top, left: coords.left });
+      } else {
+        setToolbarAnchor(null);
+      }
     },
     editorProps: {
       attributes: {
@@ -315,6 +348,22 @@ export default function TipTapEditor({
   });
 
   useEffect(() => {
+    if (!editor) return;
+    for (const proposal of pendingDiffs) {
+      if (!appliedProposalIdsRef.current.has(proposal.id)) {
+        applyTrackedChangesToEditor(editor, proposal);
+        appliedProposalIdsRef.current.add(proposal.id);
+      }
+    }
+    const currentIds = new Set(pendingDiffs.map((p) => p.id));
+    for (const id of appliedProposalIdsRef.current) {
+      if (!currentIds.has(id)) {
+        appliedProposalIdsRef.current.delete(id);
+      }
+    }
+  }, [editor, pendingDiffs]);
+
+  useEffect(() => {
     if (!editor || !externalContent) return;
     if (externalContent.nonce === appliedNonceRef.current) return;
     appliedNonceRef.current = externalContent.nonce;
@@ -322,6 +371,32 @@ export default function TipTapEditor({
     if (contentRef !== undefined) contentRef.current = externalContent.json;
     autosaveRef.current.trigger(externalContent.json);
   }, [editor, externalContent, contentRef]);
+
+  function handleResolveClick(proposalId: string, accept: boolean) {
+    if (!editor) return;
+    resolveTrackedChanges(editor, proposalId, accept);
+    const json = editor.getJSON();
+    if (contentRef !== undefined) contentRef.current = json;
+    autosaveRef.current.trigger(json);
+    onResolveDiff?.(proposalId, accept);
+    setActiveProposalId(null);
+    setToolbarAnchor(null);
+  }
+
+  function handleResolveAll(accept: boolean) {
+    if (!editor) return;
+    for (const proposal of pendingDiffs) {
+      resolveTrackedChanges(editor, proposal.id, accept);
+    }
+    const json = editor.getJSON();
+    if (contentRef !== undefined) contentRef.current = json;
+    autosaveRef.current.trigger(json);
+    for (const proposal of pendingDiffs) {
+      onResolveDiff?.(proposal.id, accept);
+    }
+    setActiveProposalId(null);
+    setToolbarAnchor(null);
+  }
 
   return (
     <div className="flex flex-col">
@@ -334,6 +409,65 @@ export default function TipTapEditor({
       <div className="overflow-auto">
         <EditorContent editor={editor} data-testid="tiptap-editor" />
       </div>
+      {activeProposalId !== null && toolbarAnchor !== null && (
+        <div
+          role="toolbar"
+          aria-label="Accept or reject tracked change"
+          style={{
+            position: "fixed",
+            top: Math.max(8, toolbarAnchor.top - 44),
+            left: toolbarAnchor.left,
+            zIndex: 50,
+          }}
+          className="flex items-center gap-1 rounded border border-border bg-surface px-2 py-1 shadow-lg"
+        >
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              handleResolveClick(activeProposalId, true);
+            }}
+            className="rounded bg-green-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-green-700"
+          >
+            Accept
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              handleResolveClick(activeProposalId, false);
+            }}
+            className="rounded bg-red-500 px-2 py-0.5 text-xs font-medium text-white hover:bg-red-600"
+          >
+            Reject
+          </button>
+          {pendingDiffs.length > 1 && (
+            <>
+              <span className="mx-1 h-4 w-px bg-border" aria-hidden="true" />
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleResolveAll(true);
+                }}
+                className="rounded px-2 py-0.5 text-xs text-green-700 hover:bg-green-50"
+              >
+                Accept all
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleResolveAll(false);
+                }}
+                className="rounded px-2 py-0.5 text-xs text-red-600 hover:bg-red-50"
+              >
+                Reject all
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
