@@ -98,10 +98,9 @@ function SortableSceneRow({
 
 interface SceneBoardProps {
   storyId: string;
-  plotDocId: string;
 }
 
-function SceneBoard({ storyId, plotDocId: _plotDocId }: SceneBoardProps) {
+function SceneBoard({ storyId }: SceneBoardProps) {
   const [rows, setRows] = useState<SceneRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -336,7 +335,7 @@ export default function PlotBoard({
         <p className="text-xs text-text-muted">{description}</p>
       </div>
       {variant === "scenes" && storyId !== undefined ? (
-        <SceneBoard storyId={storyId} plotDocId={plotDocId} />
+        <SceneBoard storyId={storyId} />
       ) : variant === "stories" && seriesId !== undefined ? (
         <StoryBoard seriesId={seriesId} plotDocId={plotDocId} initialMeta={plotDocMeta} />
       ) : null}
