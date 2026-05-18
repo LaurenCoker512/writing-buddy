@@ -30,6 +30,8 @@ export interface SeriesItem {
   mode: string;
   rating: string;
   stories: StoryItem[];
+  documents: DocumentItem[];
+  subcategories: SubcategoryItem[];
 }
 
 export interface UniverseItem {

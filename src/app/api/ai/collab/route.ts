@@ -158,6 +158,20 @@ export async function POST(req: NextRequest) {
         ).then((docs) => docs.filter((d) => d !== null))
       : [];
 
+  // For SCENE documents, automatically include the story's Plot doc as context.
+  if (document.type === "SCENE" && document.storyId !== null) {
+    const plotDoc = await prisma.document.findFirst({
+      where: {
+        storyId: document.storyId,
+        type: "PLOT",
+        id: { notIn: additionalDocIds },
+      },
+    });
+    if (plotDoc !== null) {
+      additionalDocs.unshift(plotDoc as Awaited<ReturnType<typeof findOwnedDocument>> & object);
+    }
+  }
+
   const additionalDocsMarkdown = additionalDocs
     .map((d) => tiptapToMarkdown(d.tiptapJson as TipTapNode))
     .filter((md) => md.length > 0)

@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isMode, isRating, toOptionalString } from "@/lib/hierarchy";
 import { AI_CONFIG } from "@/config/ai";
+import { buildTemplate } from "@/lib/document-templates";
 
 export async function GET() {
   const session = await auth();
@@ -48,6 +49,15 @@ export async function POST(req: NextRequest) {
       sourceTitle: toOptionalString(body.sourceTitle),
       seriesId: typeof body.seriesId === "string" ? body.seriesId : null,
       universeId: typeof body.universeId === "string" ? body.universeId : null,
+    },
+  });
+
+  await prisma.document.create({
+    data: {
+      storyId: story.id,
+      type: "PLOT",
+      name: "Plot",
+      tiptapJson: buildTemplate("PLOT"),
     },
   });
 

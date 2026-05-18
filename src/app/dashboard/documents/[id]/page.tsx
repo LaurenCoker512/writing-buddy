@@ -95,36 +95,49 @@ export default async function DocumentPage({ params }: Props) {
     : "This Universe";
 
   // Parent candidates for the specialization selector.
+  // PLOT documents don't participate in specialization.
   // Story-scoped: series-level docs in the same series + universe-level docs.
   // Series-scoped: universe-level docs.
   type ParentCandidate = { id: string; name: string; scopeLabel: string };
   let parentCandidates: ParentCandidate[] = [];
 
-  if (document.storyId !== null) {
-    const storySeriesId = document.story?.seriesId ?? null;
-    if (storySeriesId !== null) {
-      const seriesDocs = await prisma.document.findMany({
-        where: { seriesId: storySeriesId, storyId: null, type: document.type },
-        select: { id: true, name: true },
-        orderBy: { name: "asc" },
-      });
-      parentCandidates = seriesDocs.map((d) => ({ ...d, scopeLabel: "Series" }));
-    }
-    if (universeId !== null) {
+  if (document.type !== "PLOT") {
+    if (document.storyId !== null) {
+      const storySeriesId = document.story?.seriesId ?? null;
+      if (storySeriesId !== null) {
+        const seriesDocs = await prisma.document.findMany({
+          where: { seriesId: storySeriesId, storyId: null, type: document.type },
+          select: { id: true, name: true },
+          orderBy: { name: "asc" },
+        });
+        parentCandidates = seriesDocs.map((d) => ({ ...d, scopeLabel: "Series" }));
+      }
+      if (universeId !== null) {
+        const universeDocs = await prisma.document.findMany({
+          where: { universeId, storyId: null, seriesId: null, type: document.type },
+          select: { id: true, name: true },
+          orderBy: { name: "asc" },
+        });
+        parentCandidates = [...parentCandidates, ...universeDocs.map((d) => ({ ...d, scopeLabel: "Universe" }))];
+      }
+    } else if (document.seriesId !== null && universeId !== null) {
       const universeDocs = await prisma.document.findMany({
         where: { universeId, storyId: null, seriesId: null, type: document.type },
         select: { id: true, name: true },
         orderBy: { name: "asc" },
       });
-      parentCandidates = [...parentCandidates, ...universeDocs.map((d) => ({ ...d, scopeLabel: "Universe" }))];
+      parentCandidates = universeDocs.map((d) => ({ ...d, scopeLabel: "Universe" }));
     }
-  } else if (document.seriesId !== null && universeId !== null) {
-    const universeDocs = await prisma.document.findMany({
-      where: { universeId, storyId: null, seriesId: null, type: document.type },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
+  }
+
+  // For SCENE documents, fetch the story's Plot doc to link back from the workspace.
+  let plotDocId: string | null = null;
+  if (document.type === "SCENE" && document.storyId !== null) {
+    const plotDoc = await prisma.document.findFirst({
+      where: { storyId: document.storyId, type: "PLOT" },
+      select: { id: true },
     });
-    parentCandidates = universeDocs.map((d) => ({ ...d, scopeLabel: "Universe" }));
+    plotDocId = plotDoc?.id ?? null;
   }
 
   return (
@@ -142,6 +155,7 @@ export default async function DocumentPage({ params }: Props) {
       parentCandidates={parentCandidates}
       parentViews={parentViews}
       currentLabel={currentLabel}
+      plotDocId={plotDocId}
     />
   );
 }

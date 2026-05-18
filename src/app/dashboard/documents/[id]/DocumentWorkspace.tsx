@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { DOCUMENT_TYPE_LABELS } from "@/lib/documents";
 import type { DocumentTypeValue } from "@/lib/documents";
 import SplitView from "@/components/SplitView";
@@ -11,6 +12,8 @@ import DocumentMetaBar from "@/components/DocumentMetaBar";
 import DocumentLinksBar from "@/components/DocumentLinksBar";
 import ContradictionCheckerModal from "@/components/ContradictionCheckerModal";
 import ReadOnlyEditor from "@/components/ReadOnlyEditor";
+import PlotBoard from "@/components/PlotBoard";
+import { isSceneMeta } from "@/lib/document-meta";
 import type { DiffProposal } from "@/types/diff";
 import { consumePrepopulateProposals } from "@/lib/prepopulate-store";
 
@@ -42,6 +45,7 @@ interface DocumentWorkspaceProps {
   parentCandidates: ParentCandidate[];
   parentViews: ParentView[];
   currentLabel: string;
+  plotDocId?: string | null;
 }
 
 export default function DocumentWorkspace({
@@ -58,6 +62,7 @@ export default function DocumentWorkspace({
   parentCandidates,
   parentViews,
   currentLabel,
+  plotDocId,
 }: DocumentWorkspaceProps) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [externalContent, setExternalContent] = useState<
@@ -80,7 +85,17 @@ export default function DocumentWorkspace({
   );
   const editorContentRef = useRef<object>(initialJson);
 
-  const typeLabel = DOCUMENT_TYPE_LABELS[documentType as DocumentTypeValue] ?? documentType;
+  const isStoryPlot = documentType === "PLOT" && storyId !== null;
+  const isSeriesPlot = documentType === "PLOT" && seriesId !== null;
+  const isScene = documentType === "SCENE";
+
+  // For scenes: track the plotSummary field locally (persisted via PATCH on blur).
+  const [plotSummary, setPlotSummary] = useState<string>(() => {
+    if (!isScene) return "";
+    return isSceneMeta(initialMeta) ? (initialMeta.plotSummary ?? "") : "";
+  });
+
+  const typeLabel = isStoryPlot ? "" : (DOCUMENT_TYPE_LABELS[documentType as DocumentTypeValue] ?? documentType);
 
   function handleDiffProposals(proposals: DiffProposal[]) {
     setPendingDiffs(proposals);
@@ -104,6 +119,14 @@ export default function DocumentWorkspace({
     setVersionKey((k) => k + 1);
   }
 
+  async function handlePlotSummaryBlur(value: string) {
+    await fetch(`/api/documents/${documentId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ meta: { plotSummary: value } }),
+    });
+  }
+
   async function handleSetParent(candidateId: string | null) {
     const candidate = parentCandidates.find((c) => c.id === candidateId) ?? null;
     setParentDocumentId(candidateId);
@@ -123,7 +146,7 @@ export default function DocumentWorkspace({
           <h1 className="font-heading text-xl font-semibold text-text-primary">
             {documentName}
           </h1>
-          <span className="text-xs text-text-muted">{typeLabel}</span>
+          {typeLabel && <span className="text-xs text-text-muted">{typeLabel}</span>}
           {/* TODO: AU vs Canon feature — expand into a full workflow before re-enabling.
                Canon badge (isCanon === true → amber "C") hidden until the feature is complete.
           {initialMeta?.isCanon === true && (
@@ -189,6 +212,33 @@ export default function DocumentWorkspace({
                 {view.label}
               </button>
             ))}
+          </div>
+        )}
+
+        {isScene && activeViewId === null && (
+          <div className="mt-2 flex items-start gap-2">
+            <div className="flex-1">
+              <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+                Plot Summary
+              </label>
+              <input
+                type="text"
+                value={plotSummary}
+                onChange={(e) => setPlotSummary(e.target.value)}
+                onBlur={(e) => void handlePlotSummaryBlur(e.target.value)}
+                placeholder="One-line description of this scene's role in the plot…"
+                className="w-full rounded border border-border bg-background px-2 py-1 text-sm text-text-primary outline-none placeholder:text-text-muted/50 focus:ring-1 focus:ring-accent"
+                aria-label="Plot summary for this scene"
+              />
+            </div>
+            {plotDocId != null && (
+              <Link
+                href={`/dashboard/documents/${plotDocId}`}
+                className="mt-5 shrink-0 text-xs text-accent hover:underline"
+              >
+                View Plot →
+              </Link>
+            )}
           </div>
         )}
 
@@ -300,6 +350,17 @@ export default function DocumentWorkspace({
           pendingDiffs={pendingDiffs}
           onResolveDiff={handleResolveDiff}
         />
+        {(isStoryPlot || isSeriesPlot) && activeViewId === null && (
+          <div className="px-6 pb-10">
+            <PlotBoard
+              variant={isStoryPlot ? "scenes" : "stories"}
+              plotDocId={documentId}
+              storyId={storyId ?? undefined}
+              seriesId={seriesId ?? undefined}
+              plotDocMeta={initialMeta}
+            />
+          </div>
+        )}
       </div>
 
       {activeView !== null && (

@@ -23,7 +23,9 @@ export function useDocumentCreate({ onComplete, onTreeRefresh }: UseDocumentCrea
       const scopeBody =
         parent.parentType === "universe"
           ? { universeId: parent.parentId }
-          : { storyId: parent.parentId };
+          : parent.parentType === "series"
+            ? { seriesId: parent.parentId }
+            : { storyId: parent.parentId };
       const res = await fetch("/api/documents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

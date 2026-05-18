@@ -69,8 +69,10 @@ export interface CreateData {
 export interface NewDocumentState {
   parentId: string;
   parentName: string;
-  parentType: "story" | "universe";
+  parentType: "story" | "series" | "universe";
   storyMode?: string;
+  defaultType?: DocumentTypeValue;
+  forceType?: DocumentTypeValue;
 }
 
 // ── Rename Modal ──────────────────────────────────────────────────────────────
@@ -408,23 +410,39 @@ export function NewProjectModal({
 
 // ── New Document Modal ────────────────────────────────────────────────────────
 
-const UNIVERSE_DOCUMENT_TYPES = DOCUMENT_TYPE_ORDER.filter((t) => t !== "SCENE");
+// PLOT is auto-created per story (singleton); SCENE is story-only.
+const STORY_DOCUMENT_TYPES = DOCUMENT_TYPE_ORDER.filter((t) => t !== "PLOT");
+// SCENE not allowed at series level; PLOT is optional and user-created.
+const SERIES_DOCUMENT_TYPES = DOCUMENT_TYPE_ORDER.filter((t) => t !== "SCENE");
+// Neither PLOT nor SCENE allowed at universe level.
+const UNIVERSE_DOCUMENT_TYPES = DOCUMENT_TYPE_ORDER.filter(
+  (t) => t !== "PLOT" && t !== "SCENE",
+);
 
 export function NewDocumentModal({
   parentName,
   parentType,
   storyMode,
+  defaultType,
+  forceType,
   onConfirm,
   onClose,
 }: {
   parentName: string;
-  parentType: "story" | "universe";
+  parentType: "story" | "series" | "universe";
   storyMode?: string;
+  defaultType?: DocumentTypeValue;
+  forceType?: DocumentTypeValue;
   onConfirm: (type: DocumentTypeValue, name: string, sourceText?: string) => void;
   onClose: () => void;
 }) {
-  const allowedTypes = parentType === "universe" ? UNIVERSE_DOCUMENT_TYPES : DOCUMENT_TYPE_ORDER;
-  const [docType, setDocType] = useState<DocumentTypeValue>("CHARACTER");
+  const allowedTypes =
+    parentType === "universe"
+      ? UNIVERSE_DOCUMENT_TYPES
+      : parentType === "series"
+        ? SERIES_DOCUMENT_TYPES
+        : STORY_DOCUMENT_TYPES;
+  const [docType, setDocType] = useState<DocumentTypeValue>(forceType ?? defaultType ?? "CHARACTER");
   const [name, setName] = useState("");
   const [sourceText, setSourceText] = useState("");
   const [saving, setSaving] = useState(false);
@@ -445,30 +463,32 @@ export function NewDocumentModal({
   return (
     <Modal onClose={onClose} data-testid="new-document-modal">
       <h2 className="mb-1 font-heading text-lg font-semibold text-text-primary">
-        New Document
+        {forceType !== undefined ? `New ${DOCUMENT_TYPE_LABELS[forceType]}` : "New Document"}
       </h2>
       <p className="mb-4 text-xs text-text-muted">In: {parentName}</p>
 
-        <fieldset className="mb-4">
-          <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-text-muted">
-            Type
-          </legend>
-          <div className="grid grid-cols-3 gap-1.5">
-            {allowedTypes.map((type) => (
-              <button
-                key={type}
-                onClick={() => setDocType(type)}
-                className={`rounded border px-2 py-1.5 text-xs transition-colors ${
-                  docType === type
-                    ? "border-accent bg-accent text-white"
-                    : "border-border text-text-muted hover:border-accent hover:text-text-primary"
-                }`}
-              >
-                {DOCUMENT_TYPE_LABELS[type]}
-              </button>
-            ))}
-          </div>
-        </fieldset>
+        {forceType === undefined && (
+          <fieldset className="mb-4">
+            <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-text-muted">
+              Type
+            </legend>
+            <div className="grid grid-cols-3 gap-1.5">
+              {allowedTypes.map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setDocType(type)}
+                  className={`rounded border px-2 py-1.5 text-xs transition-colors ${
+                    docType === type
+                      ? "border-accent bg-accent text-white"
+                      : "border-border text-text-muted hover:border-accent hover:text-text-primary"
+                  }`}
+                >
+                  {DOCUMENT_TYPE_LABELS[type]}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        )}
 
         <div className="mb-4">
           <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-text-muted">

@@ -59,6 +59,30 @@ export const RELATIONSHIP_TYPES = [
   "Other",
 ] as const;
 
+export interface SceneMeta {
+  plotSummary?: string;
+}
+
+export interface PlotMeta {
+  storySummaries?: Record<string, string>;
+}
+
+export function isSceneMeta(value: unknown): value is SceneMeta {
+  if (typeof value !== "object" || value === null) return false;
+  const meta = value as Record<string, unknown>;
+  return meta.plotSummary === undefined || typeof meta.plotSummary === "string";
+}
+
+export function isPlotMeta(value: unknown): value is PlotMeta {
+  if (typeof value !== "object" || value === null) return false;
+  const meta = value as Record<string, unknown>;
+  if (meta.storySummaries === undefined) return true;
+  if (typeof meta.storySummaries !== "object" || meta.storySummaries === null) return false;
+  return Object.values(meta.storySummaries as Record<string, unknown>).every(
+    (v) => typeof v === "string",
+  );
+}
+
 export const WORLDBUILDING_CATEGORIES = [
   "Location",
   "Faction / Organization",

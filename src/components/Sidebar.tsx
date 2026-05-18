@@ -76,7 +76,7 @@ interface ContextMenuState {
 
 type NewSubcategoryState = {
   parentId: string;
-  parentType: "story" | "universe";
+  parentType: "story" | "series" | "universe";
   documentType: string;
   value: string;
 };
@@ -128,9 +128,11 @@ function ContextMenuDropdown({
       className="fixed z-50 min-w-[140px] rounded border border-border bg-surface py-1 shadow-lg"
       style={{ top: menu.y, left: menu.x }}
     >
-      <button role="menuitem" className={menuItemClass} onClick={onRename}>
-        Rename
-      </button>
+      {menu.docType !== "PLOT" && (
+        <button role="menuitem" className={menuItemClass} onClick={onRename}>
+          Rename
+        </button>
+      )}
       {menu.type === "universe" && onImportCanon !== undefined && (
         <button role="menuitem" className={menuItemClass} onClick={onImportCanon}>
           Import Canon Text
@@ -199,13 +201,15 @@ function ContextMenuDropdown({
           </a>
         </>
       )}
-      <button
-        role="menuitem"
-        className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-background"
-        onClick={onDelete}
-      >
-        Delete
-      </button>
+      {menu.docType !== "PLOT" && (
+        <button
+          role="menuitem"
+          className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-background"
+          onClick={onDelete}
+        >
+          Delete
+        </button>
+      )}
     </div>
   );
 }
@@ -403,6 +407,12 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
   useEffect(() => {
     void fetchTree();
+  }, [fetchTree]);
+
+  useEffect(() => {
+    const handler = () => void fetchTree();
+    window.addEventListener("writing-buddy:tree-refresh", handler);
+    return () => window.removeEventListener("writing-buddy:tree-refresh", handler);
   }, [fetchTree]);
 
   const { createDocument } = useDocumentCreate({
@@ -621,12 +631,203 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     documents: DocumentItem[],
     depth: number,
     parentId: string,
-    parentType: "story" | "universe",
+    parentType: "story" | "series" | "universe",
     subcategories: SubcategoryItem[],
     mapHref?: string,
     mapAriaLabel?: string,
+    parentName?: string,
+    storyMode?: string,
   ) =>
     DOCUMENT_TYPE_ORDER.flatMap((type) => {
+      // Story-scoped SCENE documents are nested under the Plot entry; skip standalone rendering.
+      if (type === "SCENE" && parentType === "story") return [];
+
+      // Story-scoped PLOT: render as a special collapsible singleton with Scenes nested beneath.
+      if (type === "PLOT" && parentType === "story") {
+        const sortedScenes = documents
+          .filter((d) => d.type === "SCENE")
+          .sort((a, b) => {
+            if (a.order !== null && b.order !== null) return a.order - b.order;
+            if (a.order !== null) return -1;
+            if (b.order !== null) return 1;
+            return 0;
+          });
+        const sceneSubs = subcategories.filter((s) => s.documentType === "SCENE");
+        const plotDoc = documents.find((d) => d.type === "PLOT");
+        if (!plotDoc) return [];
+
+        const plotScenesKey = `${parentId}-plot-scenes`;
+        const areScenesExpanded = !collapsedSections.has(plotScenesKey);
+        const isPlotActive = pathname === `/dashboard/documents/${plotDoc.id}`;
+
+        const sceneSection = areScenesExpanded
+          ? [
+              <li key={`plot-scenes-${parentId}`}>
+                <ul>
+                  {sceneSubs.length > 0 ? (
+                    // Render scenes grouped by subcategory
+                    (() => {
+                      const subGroups = sceneSubs.flatMap((sub) => {
+                        const subDocs = sortedScenes.filter((d) => d.subcategoryId === sub.id);
+                        const subKey = `${parentId}-subcat-${sub.id}`;
+                        const isSubCollapsed = collapsedSections.has(subKey);
+                        const subHeader = (
+                          <li key={`subcat-header-${sub.id}`} className="group/subcat">
+                            <div className="flex items-center" style={{ paddingLeft: `${(depth + 1) * 12 + 20}px`, paddingRight: "8px" }}>
+                              <button
+                                onClick={() => toggleSection(subKey)}
+                                className="flex flex-1 items-center gap-1 py-0.5 text-xs text-text-muted hover:text-text-primary"
+                                aria-expanded={!isSubCollapsed}
+                              >
+                                {!collapsed && <ChevronIcon expanded={!isSubCollapsed} className="h-2 w-2 shrink-0" />}
+                                {!collapsed && <span className="truncate">{sub.name}</span>}
+                              </button>
+                              {!collapsed && (
+                                <button
+                                  onClick={(e) => openContextMenu(e, sub.id, "subcategory", sub.name)}
+                                  className="invisible shrink-0 rounded p-0.5 text-text-muted hover:bg-border hover:text-text-primary group-hover/subcat:visible"
+                                  aria-label={`Options for subcategory ${sub.name}`}
+                                >
+                                  <DotsIcon className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                          </li>
+                        );
+                        if (isSubCollapsed) return [subHeader];
+                        return [
+                          subHeader,
+                          <li key={`subcat-scene-${sub.id}`}>
+                            <ul>
+                              <SortableSceneList
+                                docs={subDocs}
+                                depth={depth + 2}
+                                pathname={pathname}
+                                collapsed={collapsed}
+                                availableSubcategories={sceneSubs}
+                                onContextMenu={(e, id, name, meta, docType, subcategoryId, avail) =>
+                                  openContextMenu(e, id, "document", name, meta, docType, subcategoryId, avail)
+                                }
+                              />
+                            </ul>
+                          </li>,
+                        ];
+                      });
+                      const uncategorized = sortedScenes.filter(
+                        (d) => !sceneSubs.some((s) => s.id === d.subcategoryId),
+                      );
+                      return [
+                        ...subGroups,
+                        ...(uncategorized.length > 0
+                          ? [
+                              <li key={`uncat-label-${parentId}-SCENE`}>
+                                <p
+                                  className="pb-0.5 pt-1 text-[10px] uppercase tracking-wide text-text-muted/50"
+                                  style={{ paddingLeft: `${(depth + 1) * 12 + 22}px` }}
+                                >
+                                  {!collapsed && "Uncategorized"}
+                                </p>
+                              </li>,
+                              <li key={`uncat-scene-${parentId}`}>
+                                <ul>
+                                  <SortableSceneList
+                                    docs={uncategorized}
+                                    depth={depth + 2}
+                                    pathname={pathname}
+                                    collapsed={collapsed}
+                                    availableSubcategories={sceneSubs}
+                                    onContextMenu={(e, id, name, meta, docType, subcategoryId, avail) =>
+                                      openContextMenu(e, id, "document", name, meta, docType, subcategoryId, avail)
+                                    }
+                                  />
+                                </ul>
+                              </li>,
+                            ]
+                          : []),
+                      ];
+                    })()
+                  ) : (
+                    <SortableSceneList
+                      docs={sortedScenes}
+                      depth={depth + 1}
+                      pathname={pathname}
+                      collapsed={collapsed}
+                      availableSubcategories={sceneSubs}
+                      onContextMenu={(e, id, name, meta, docType, subcategoryId, avail) =>
+                        openContextMenu(e, id, "document", name, meta, docType, subcategoryId, avail)
+                      }
+                    />
+                  )}
+                </ul>
+              </li>,
+            ]
+          : [];
+
+        return [
+          <li key={`plot-entry-${plotDoc.id}`} className="group/plot">
+            <div
+              className={`flex items-center gap-1 rounded px-2 py-1.5 text-sm transition-colors ${
+                isPlotActive ? "bg-accent/10 text-accent" : "text-text-primary hover:bg-background"
+              }`}
+              style={{ paddingLeft: `${depth * 12 + 8}px` }}
+            >
+              <button
+                onClick={() => toggleSection(plotScenesKey)}
+                className="shrink-0 text-text-muted"
+                aria-label={areScenesExpanded ? "Collapse scenes" : "Expand scenes"}
+              >
+                <ChevronIcon expanded={areScenesExpanded} className="h-3 w-3" />
+              </button>
+              <Link
+                href={`/dashboard/documents/${plotDoc.id}`}
+                className="flex flex-1 items-center gap-1.5 truncate"
+                data-testid={`document-node-${plotDoc.id}`}
+                aria-label="Plot"
+                aria-current={isPlotActive ? "page" : undefined}
+              >
+                <FileIcon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
+                {!collapsed && <span className="truncate">Plot</span>}
+              </Link>
+              {!collapsed && (
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (parentName !== undefined) {
+                        setNewDocumentModal({
+                          parentId,
+                          parentName,
+                          parentType: "story",
+                          storyMode,
+                          forceType: "SCENE",
+                        });
+                        if (!areScenesExpanded) toggleSection(plotScenesKey);
+                      }
+                    }}
+                    className="opacity-0 shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover/plot:opacity-100 focus:opacity-100"
+                    aria-label="Add scene"
+                    data-testid={`plot-add-scene-${parentId}`}
+                  >
+                    <PlusIcon className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={(e) =>
+                      openContextMenu(e, plotDoc.id, "document", "Plot", plotDoc.meta, "PLOT")
+                    }
+                    className="opacity-0 shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover/plot:opacity-100 focus:opacity-100"
+                    aria-label="Plot options"
+                    data-testid={`document-menu-${plotDoc.id}`}
+                  >
+                    <DotsIcon className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              )}
+            </div>
+          </li>,
+          ...sceneSection,
+        ];
+      }
+
       const docs = documents
         .filter((d) => d.type === type)
         .sort((a, b) => {
@@ -918,6 +1119,8 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               story.subcategories,
               `/dashboard/stories/${story.id}/map`,
               `Relationship Map for ${story.name}`,
+              story.name,
+              story.mode,
             )}
           </ul>
         )}
@@ -927,7 +1130,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
   const renderSeriesNode = (series: SeriesItem, depth: number) => {
     const isExpanded = expanded.has(series.id);
-    const hasChildren = series.stories.length > 0;
+    const hasChildren = series.stories.length > 0 || series.documents.length > 0;
 
     return (
       <li key={series.id}>
@@ -965,20 +1168,39 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             )}
           </button>
           {!collapsed && (
-            <button
-              onClick={(e) =>
-                openContextMenu(e, series.id, "series", series.name)
-              }
-              className="opacity-0 shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:opacity-100 focus:opacity-100"
-              aria-label={`Options for ${series.name}`}
-              data-testid={`series-menu-${series.id}`}
-            >
-              <DotsIcon className="h-3.5 w-3.5" />
-            </button>
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setNewDocumentModal({ parentId: series.id, parentName: series.name, parentType: "series" });
+                }}
+                className="opacity-0 shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:opacity-100 focus:opacity-100"
+                aria-label={`Add document to ${series.name}`}
+              >
+                <PlusIcon className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={(e) =>
+                  openContextMenu(e, series.id, "series", series.name)
+                }
+                className="opacity-0 shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:opacity-100 focus:opacity-100"
+                aria-label={`Options for ${series.name}`}
+                data-testid={`series-menu-${series.id}`}
+              >
+                <DotsIcon className="h-3.5 w-3.5" />
+              </button>
+            </>
           )}
         </div>
         {isExpanded && hasChildren && (
           <ul>
+            {renderDocumentSections(
+              series.documents,
+              depth + 1,
+              series.id,
+              "series",
+              series.subcategories,
+            )}
             {series.stories.map((s) => renderStoryNode(s, depth + 1))}
           </ul>
         )}
@@ -1286,6 +1508,8 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           parentName={newDocumentModal.parentName}
           parentType={newDocumentModal.parentType}
           storyMode={newDocumentModal.storyMode}
+          defaultType={newDocumentModal.defaultType}
+          forceType={newDocumentModal.forceType}
           onConfirm={(type, name, sourceText) =>
             void createDocument(newDocumentModal, type, name, sourceText)
           }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { buildTemplate } from "@/lib/document-templates";
 
 export async function GET() {
   const session = await auth();
@@ -28,6 +29,15 @@ export async function GET() {
     subcategories: subcategorySelect,
   };
 
+  const seriesInclude = {
+    documents: documentSelect,
+    subcategories: subcategorySelect,
+    stories: {
+      include: storyInclude,
+      orderBy: { createdAt: "asc" as const },
+    },
+  };
+
   const [universes, standaloneSeries, standaloneStories] = await Promise.all([
     prisma.universe.findMany({
       where: { userId },
@@ -35,12 +45,7 @@ export async function GET() {
         documents: documentSelect,
         subcategories: subcategorySelect,
         series: {
-          include: {
-            stories: {
-              include: storyInclude,
-              orderBy: { createdAt: "asc" },
-            },
-          },
+          include: seriesInclude,
           orderBy: { createdAt: "asc" },
         },
         stories: {
@@ -53,12 +58,7 @@ export async function GET() {
     }),
     prisma.series.findMany({
       where: { userId, universeId: null },
-      include: {
-        stories: {
-          include: storyInclude,
-          orderBy: { createdAt: "asc" },
-        },
-      },
+      include: seriesInclude,
       orderBy: { createdAt: "asc" },
     }),
     prisma.story.findMany({
@@ -67,6 +67,68 @@ export async function GET() {
       orderBy: { createdAt: "asc" },
     }),
   ]);
+
+  // Collect all stories and lazy-create missing PLOT documents.
+  type StoryWithDocs = { id: string; documents: { type: string }[] };
+  const allStories: StoryWithDocs[] = [
+    ...standaloneStories,
+    ...standaloneSeries.flatMap((s) => s.stories),
+    ...universes.flatMap((u) => [
+      ...u.stories,
+      ...u.series.flatMap((s) => s.stories),
+    ]),
+  ];
+  const storiesWithoutPlot = allStories.filter(
+    (s) => !s.documents.some((d) => d.type === "PLOT"),
+  );
+
+  if (storiesWithoutPlot.length > 0) {
+    await Promise.all(
+      storiesWithoutPlot.map((s) =>
+        prisma.document.create({
+          data: {
+            storyId: s.id,
+            type: "PLOT",
+            name: "Plot",
+            tiptapJson: buildTemplate("PLOT"),
+          },
+        }),
+      ),
+    );
+    // Re-fetch the full tree so the response includes the newly created Plot docs.
+    const [universesRefetched, standaloneSeriesRefetched, standaloneStoriesRefetched] =
+      await Promise.all([
+        prisma.universe.findMany({
+          where: { userId },
+          include: {
+            documents: documentSelect,
+            subcategories: subcategorySelect,
+            series: { include: seriesInclude, orderBy: { createdAt: "asc" } },
+            stories: {
+              where: { seriesId: null },
+              include: storyInclude,
+              orderBy: { createdAt: "asc" },
+            },
+          },
+          orderBy: { createdAt: "asc" },
+        }),
+        prisma.series.findMany({
+          where: { userId, universeId: null },
+          include: seriesInclude,
+          orderBy: { createdAt: "asc" },
+        }),
+        prisma.story.findMany({
+          where: { userId, seriesId: null, universeId: null },
+          include: storyInclude,
+          orderBy: { createdAt: "asc" },
+        }),
+      ]);
+    return NextResponse.json({
+      universes: universesRefetched,
+      standaloneSeries: standaloneSeriesRefetched,
+      standaloneStories: standaloneStoriesRefetched,
+    });
+  }
 
   return NextResponse.json({ universes, standaloneSeries, standaloneStories });
 }

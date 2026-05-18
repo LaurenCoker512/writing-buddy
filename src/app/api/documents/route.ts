@@ -88,6 +88,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Enforce scope-based type restrictions
+  if (universeId && (body.type === "PLOT" || body.type === "SCENE")) {
+    return NextResponse.json(
+      { error: `${body.type === "PLOT" ? "Plot" : "Scene"} documents cannot be created at the universe level` },
+      { status: 400 },
+    );
+  }
+  if (seriesId && body.type === "SCENE") {
+    return NextResponse.json(
+      { error: "Scene documents cannot be created at the series level" },
+      { status: 400 },
+    );
+  }
+
   // Verify ownership via the most specific scope
   if (storyId) {
     const story = await prisma.story.findFirst({ where: { id: storyId, userId } });
@@ -98,6 +112,17 @@ export async function POST(req: NextRequest) {
   } else if (universeId) {
     const universe = await prisma.universe.findFirst({ where: { id: universeId, userId } });
     if (!universe) return NextResponse.json({ error: "Universe not found" }, { status: 404 });
+  }
+
+  // Enforce PLOT singleton at story scope
+  if (storyId && body.type === "PLOT") {
+    const existingPlot = await prisma.document.findFirst({ where: { storyId, type: "PLOT" } });
+    if (existingPlot) {
+      return NextResponse.json(
+        { error: "A Plot document already exists for this story" },
+        { status: 409 },
+      );
+    }
   }
 
   const tiptapJson =

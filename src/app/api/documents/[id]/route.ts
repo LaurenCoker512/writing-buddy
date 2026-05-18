@@ -130,6 +130,13 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams<{ id: st
   const existing = await findOwnedDocument(id, session.user.id);
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  if (existing.type === "PLOT" && existing.storyId !== null) {
+    return NextResponse.json(
+      { error: "The Plot document cannot be deleted" },
+      { status: 400 },
+    );
+  }
+
   await prisma.document.delete({ where: { id } });
 
   return new NextResponse(null, { status: 204 });
