@@ -2,13 +2,173 @@
 @tailwind components;
 @tailwind utilities;
 
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--rule-soft); }
+
 :root {
-  --font-lora: "Lora", Georgia, serif;
-  --font-inter: "Inter", system-ui, sans-serif;
+  --bg: #F6EFE2;
+  --surface: #FBF5EA;
+  --surface-2: #F1E8D6;
+  --paper: #FBF5EA;
+  --ink: #221E1A;
+  --ink-soft: #4B4339;
+  --muted: #9A8E7E;
+  --muted-2: #C5B8A3;
+  --rule: #E3D6BD;
+  --rule-soft: #ECE0C9;
+  --accent: #B86A47;
+  --accent-soft: #E9C9B7;
+  --accent-deep: #964F2F;
+  --ai: #7B9D7E;
+  --ai-soft: #DDE9DC;
+  --ai-deep: #557959;
+  --gold: #C99B5E;
+  --font-display: "Newsreader", Lora, "Iowan Old Style", Georgia, serif;
+  --font-body: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-hand: "Caveat", "Bradley Hand", cursive;
 }
 
 body {
-  background-color: #FAF7F2;
-  color: #1C1A17;
-  font-family: var(--font-inter);
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
 }
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+/* Paper grain overlay */
+.paper-grain {
+  position: relative;
+}
+.paper-grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.45;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+}
+
+/* Breathing animation for AI status dot */
+@keyframes breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(123, 157, 126, 0.6); }
+  50% { box-shadow: 0 0 0 5px rgba(123, 157, 126, 0); }
+}
+.pulse-dot {
+  animation: breathe 2.6s ease-in-out infinite;
+}
+
+/* Bob animation for thinking dots */
+@keyframes bob {
+  0%, 100% { transform: translateY(0); opacity: 0.5; }
+  50% { transform: translateY(-3px); opacity: 1; }
+}
+
+/* Wordmark logotype mark */
+.wordmark-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: radial-gradient(circle at 30% 25%, #f6d28a 0 28%, transparent 30%),
+              linear-gradient(160deg, #B86A47 0%, #964F2F 100%);
+  position: relative;
+  box-shadow: 0 1px 2px rgba(80, 55, 25, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  flex-shrink: 0;
+}
+.wordmark-mark::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 56%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 10px;
+  background: #fbf0d6;
+  border-radius: 2px;
+  box-shadow: 0 -8px 0 -1px #fbf0d6;
+}
+
+/* Section rule for sidebar headings */
+.section-rule {
+  display: block;
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, #E3D6BD, transparent);
+}
+
+/* ── Editor prose ──────────────────────────────────────────────────────────── */
+.editor-prose {
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--ink);
+}
+.editor-prose p { margin: 0 0 16px; }
+.editor-prose h1 {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 500;
+  margin: 28px 0 12px;
+  color: var(--ink);
+}
+.editor-prose h2 {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 32px 0 10px;
+  color: var(--ink);
+}
+.editor-prose h2::before {
+  content: "§";
+  font-family: var(--font-display);
+  font-style: italic;
+  color: var(--accent);
+  margin-right: 8px;
+  font-weight: 400;
+}
+.editor-prose h3 {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 500;
+  margin: 22px 0 6px;
+  color: var(--ink);
+}
+.editor-prose strong { font-weight: 600; }
+.editor-prose em { font-family: var(--font-display); font-style: italic; }
+.editor-prose blockquote {
+  margin: 18px 0;
+  padding: 8px 0 8px 18px;
+  border-left: 2px solid var(--accent);
+  color: var(--ink-soft, #6B5F52);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 16px;
+}
+.editor-prose ul { margin: 0 0 16px; padding-left: 22px; list-style-type: disc; }
+.editor-prose ol { margin: 0 0 16px; padding-left: 22px; list-style-type: decimal; }
+.editor-prose li { margin-bottom: 6px; }
+.editor-prose ul li::marker { color: var(--accent); }
+.editor-prose hr {
+  border: 0;
+  height: 14px;
+  margin: 28px 0;
+  background: center / contain no-repeat url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 14'><path d='M2 7 Q 10 2 18 7 T 34 7 T 50 7 T 66 7 T 78 7' stroke='%23C5B8A3' stroke-width='1.2' fill='none' stroke-linecap='round'/></svg>");
+}
+.editor-prose a { color: var(--accent); text-decoration: underline; }
+.editor-prose table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+.editor-prose th,
+.editor-prose td { border: 1px solid var(--rule, #E3D6BD); padding: 6px 10px; text-align: left; font-size: 14px; }
+.editor-prose th { background: var(--surface-2); font-weight: 600; font-size: 11px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.05em; }
