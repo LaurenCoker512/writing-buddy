@@ -8,6 +8,13 @@ import { Table } from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
+import {
+  BoldIcon, ItalicIcon, UnderlineIcon,
+  H1Icon, H2Icon, H3Icon,
+  ListIcon, OrderedListIcon,
+  QuoteIcon, HrIcon,
+  CopyIcon, DownloadIcon, TableIcon,
+} from "@/components/icons";
 import { createAutosave, type PatchFn } from "@/lib/autosave";
 import { tiptapToMarkdown } from "@/lib/tiptap-to-markdown";
 import type { TipTapNode } from "@/lib/tiptap-to-markdown";
@@ -38,11 +45,12 @@ function ToolbarButton({
       disabled={disabled}
       aria-label={label}
       aria-pressed={active}
-      className={`rounded px-2 py-1 text-sm font-medium transition-colors disabled:opacity-40 ${
+      className={`flex h-[30px] w-[30px] items-center justify-center rounded-full transition-colors disabled:opacity-40 ${
         active
-          ? "bg-accent/10 text-accent"
-          : "text-text-muted hover:bg-background hover:text-text-primary"
+          ? "text-accent-deep"
+          : "text-text-muted hover:bg-surface-2 hover:text-text-primary"
       }`}
+      style={active ? { backgroundColor: "var(--accent-soft)" } : {}}
     >
       {children}
     </button>
@@ -50,7 +58,7 @@ function ToolbarButton({
 }
 
 function Divider() {
-  return <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />;
+  return <span className="mx-0.5 h-[18px] w-px shrink-0 bg-border" aria-hidden="true" />;
 }
 
 function downloadBlob(content: string, filename: string, mimeType: string) {
@@ -83,6 +91,7 @@ function Toolbar({
       isUnderline: ed.isActive("underline"),
       isBulletList: ed.isActive("bulletList"),
       isOrderedList: ed.isActive("orderedList"),
+      isBlockquote: ed.isActive("blockquote"),
       isTable: ed.isActive("table"),
       canInsertTable: ed.can().insertTable({ rows: 3, cols: 3, withHeaderRow: true }),
     }),
@@ -103,113 +112,69 @@ function Toolbar({
     <div
       role="toolbar"
       aria-label="Formatting toolbar"
-      className="sticky top-0 z-10 flex flex-wrap items-center gap-0.5 border-b border-border bg-surface px-3 py-1.5"
+      className="sticky top-3 z-10 mx-auto mb-6 flex w-max items-center gap-0.5 rounded-full border border-border bg-surface px-1.5 py-1 shadow-sm"
     >
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-        active={state.isH1}
-        label="Heading 1"
-      >
-        H1
+      <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={state.isH1} label="Heading 1">
+        <H1Icon className="h-[15px] w-[15px]" />
       </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-        active={state.isH2}
-        label="Heading 2"
-      >
-        H2
+      <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={state.isH2} label="Heading 2">
+        <H2Icon className="h-[15px] w-[15px]" />
       </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-        active={state.isH3}
-        label="Heading 3"
-      >
-        H3
+      <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={state.isH3} label="Heading 3">
+        <H3Icon className="h-[15px] w-[15px]" />
       </ToolbarButton>
 
       <Divider />
 
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleBold().run()}
-        active={state.isBold}
-        label="Bold"
-      >
-        <strong>B</strong>
+      <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={state.isBold} label="Bold">
+        <BoldIcon className="h-[15px] w-[15px]" />
       </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleItalic().run()}
-        active={state.isItalic}
-        label="Italic"
-      >
-        <em>I</em>
+      <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={state.isItalic} label="Italic">
+        <ItalicIcon className="h-[15px] w-[15px]" />
       </ToolbarButton>
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleUnderline().run()}
-        active={state.isUnderline}
-        label="Underline"
-      >
-        <span className="underline">U</span>
+      <ToolbarButton onClick={() => editor.chain().focus().toggleUnderline().run()} active={state.isUnderline} label="Underline">
+        <UnderlineIcon className="h-[15px] w-[15px]" />
       </ToolbarButton>
 
       <Divider />
 
-      <ToolbarButton
-        onClick={() => editor.chain().focus().toggleBulletList().run()}
-        active={state.isBulletList}
-        label="Bulleted list"
-      >
-        ≡
+      <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={state.isBulletList} label="Bulleted list">
+        <ListIcon className="h-[15px] w-[15px]" />
+      </ToolbarButton>
+      <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={state.isOrderedList} label="Numbered list">
+        <OrderedListIcon className="h-[15px] w-[15px]" />
+      </ToolbarButton>
+      <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={state.isBlockquote} label="Blockquote">
+        <QuoteIcon className="h-[15px] w-[15px]" />
+      </ToolbarButton>
+      <ToolbarButton onClick={() => editor.chain().focus().setHorizontalRule().run()} label="Horizontal rule">
+        <HrIcon className="h-[15px] w-[15px]" />
       </ToolbarButton>
       <ToolbarButton
-        onClick={() => editor.chain().focus().toggleOrderedList().run()}
-        active={state.isOrderedList}
-        label="Numbered list"
-      >
-        1≡
-      </ToolbarButton>
-
-      <Divider />
-
-      <ToolbarButton
-        onClick={() =>
-          editor
-            .chain()
-            .focus()
-            .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
-            .run()
-        }
+        onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
         active={state.isTable}
         disabled={!state.canInsertTable}
         label="Insert table"
       >
-        ⊞
+        <TableIcon className="h-[15px] w-[15px]" />
       </ToolbarButton>
 
       <Divider />
 
-      <ToolbarButton
-        onClick={() => editor.chain().focus().setHorizontalRule().run()}
-        label="Horizontal rule"
-      >
-        ─
-      </ToolbarButton>
-
-      <Divider />
-
-      <ToolbarButton onClick={handleDownloadMarkdown} label="Download as Markdown">
-        ↓ .md
-      </ToolbarButton>
       <ToolbarButton onClick={handleCopyMarkdown} label="Copy as Markdown">
-        ⎘ md
+        <CopyIcon className="h-[14px] w-[14px]" />
+      </ToolbarButton>
+      <ToolbarButton onClick={handleDownloadMarkdown} label="Download as Markdown">
+        <DownloadIcon className="h-[14px] w-[14px]" />
       </ToolbarButton>
       <a
         href={`/api/export/document/${documentId}/pdf`}
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Export as PDF"
-        className="rounded px-2 py-1 text-sm font-medium text-text-muted transition-colors hover:bg-background hover:text-text-primary"
+        className="flex h-[30px] items-center rounded-full px-2.5 font-mono text-[10px] uppercase tracking-wider text-text-muted transition-colors hover:bg-surface-2 hover:text-text-primary"
       >
-        ↓ PDF
+        PDF
       </a>
     </div>
   );
@@ -339,7 +304,7 @@ export default function TipTapEditor({
     editorProps: {
       attributes: {
         class:
-          "prose prose-sm max-w-none focus:outline-none min-h-[calc(100vh-12rem)] px-8 py-6",
+          "editor-prose focus:outline-none min-h-[calc(100vh-16rem)]",
         "aria-label": documentName,
         role: "textbox",
         "aria-multiline": "true",
@@ -399,16 +364,14 @@ export default function TipTapEditor({
   }
 
   return (
-    <div className="flex flex-col">
+    <div className="mx-auto max-w-[760px] px-14 pt-8 pb-32">
       {editor && (
         <Toolbar editor={editor} documentId={documentId} documentName={documentName} />
       )}
-      <div className="flex items-center justify-end border-b border-border bg-surface px-4 py-1">
+      <div className="flex justify-end pb-3">
         <SaveIndicator status={saveStatus} />
       </div>
-      <div className="overflow-auto">
-        <EditorContent editor={editor} data-testid="tiptap-editor" />
-      </div>
+      <EditorContent editor={editor} data-testid="tiptap-editor" />
       {activeProposalId !== null && toolbarAnchor !== null && (
         <div
           role="toolbar"
