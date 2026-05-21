@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -29,6 +29,7 @@ import type {
 } from "@/types/project-tree";
 import {
   DOCUMENT_SECTION_LABELS,
+  DOCUMENT_TYPE_LABELS,
   DOCUMENT_TYPE_ORDER,
 } from "@/lib/documents";
 import { calculateInsertOrder } from "@/lib/scene-order";
@@ -59,8 +60,16 @@ import {
   FileIcon,
   GripIcon,
   GraphIcon,
+  SearchIcon,
+  UsersIcon,
+  HeartLinkIcon,
+  MountainIcon,
+  NoteIcon,
+  CompassIcon,
 } from "@/components/icons";
 import { useDocumentCreate } from "@/hooks/useDocumentCreate";
+import { signOut } from "next-auth/react";
+import { useBreadcrumbs, type BreadcrumbItem } from "@/contexts/BreadcrumbContext";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -86,6 +95,15 @@ type NewSubcategoryState = {
 interface CanonIngestionState {
   universeId: string;
   universeName: string;
+}
+
+interface SearchResult {
+  id: string;
+  name: string;
+  kind: "universe" | "series" | "story" | "document";
+  breadcrumb: string;
+  docType?: string;
+  href?: string;
 }
 
 // ── Context Menu ──────────────────────────────────────────────────────────────
@@ -252,7 +270,7 @@ function SortableSceneItem({
       <div
         className={`group flex items-center gap-1.5 rounded px-2 py-1.5 text-sm transition-colors ${
           isActive
-            ? "bg-accent/10 text-accent"
+            ? "relative bg-accent/10 text-accent before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:rounded-full before:bg-accent"
             : "text-text-primary hover:bg-background"
         }`}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
@@ -373,9 +391,10 @@ function SortableSceneList({
 interface SidebarProps {
   mobileOpen: boolean;
   onMobileClose: () => void;
+  displayName: string;
 }
 
-export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
+export default function Sidebar({ mobileOpen, onMobileClose, displayName }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [tree, setTree] = useState<ProjectTree | null>(null);
@@ -392,6 +411,36 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const [moveStoryModal, setMoveStoryModal] = useState<MoveStoryState | null>(null);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [newSubcategoryState, setNewSubcategoryState] = useState<NewSubcategoryState | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    const onClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [userMenuOpen]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      if (e.key === "Escape" && searchQuery) {
+        setSearchQuery("");
+        searchInputRef.current?.blur();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [searchQuery]);
 
   useEffect(() => {
     const stored = localStorage.getItem("sidebar-collapsed");
@@ -592,7 +641,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       <div
         className={`group flex items-center gap-1.5 rounded px-2 py-1.5 text-sm transition-colors ${
           isActive
-            ? "bg-accent/10 text-accent"
+            ? "relative bg-accent/10 text-accent before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:rounded-full before:bg-accent"
             : "text-text-primary hover:bg-background"
         }`}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
@@ -604,11 +653,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           aria-label={doc.name}
           aria-current={isActive ? "page" : undefined}
         >
-          {doc.type === "BRAINSTORM" ? (
-            <BrainstormIcon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
-          ) : (
-            <FileIcon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
-          )}
+          {(() => { const DocIcon = docTypeIcon(doc.type); return <DocIcon className="h-3.5 w-3.5 shrink-0 text-text-muted" />; })()}
           {!collapsed && <span className="truncate">{doc.name}</span>}
           {/* TODO: AU vs Canon feature — expand into a full workflow before re-enabling.
                Sidebar Canon ("C") and AU badges hidden until the feature is complete.
@@ -646,7 +691,199 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   );
   };
 
+  const searchIndex = useMemo((): SearchResult[] => {
+    if (!tree) return [];
+    const results: SearchResult[] = [];
+
+    const addDocs = (docs: DocumentItem[], parentName: string) => {
+      for (const doc of docs) {
+        results.push({
+          id: doc.id,
+          name: doc.name,
+          kind: "document",
+          breadcrumb: parentName,
+          docType: doc.type,
+          href: `/dashboard/documents/${doc.id}`,
+        });
+      }
+    };
+
+    for (const universe of tree.universes) {
+      results.push({ id: universe.id, name: universe.name, kind: "universe", breadcrumb: "Universe" });
+      addDocs(universe.documents, universe.name);
+      for (const series of universe.series) {
+        results.push({ id: series.id, name: series.name, kind: "series", breadcrumb: universe.name });
+        addDocs(series.documents, `${universe.name} · ${series.name}`);
+        for (const story of series.stories) {
+          results.push({ id: story.id, name: story.name, kind: "story", breadcrumb: `${series.name} · ${universe.name}` });
+          addDocs(story.documents, story.name);
+        }
+      }
+      for (const story of universe.stories) {
+        results.push({ id: story.id, name: story.name, kind: "story", breadcrumb: universe.name });
+        addDocs(story.documents, story.name);
+      }
+    }
+
+    for (const series of tree.standaloneSeries) {
+      results.push({ id: series.id, name: series.name, kind: "series", breadcrumb: "Series" });
+      addDocs(series.documents, series.name);
+      for (const story of series.stories) {
+        results.push({ id: story.id, name: story.name, kind: "story", breadcrumb: series.name });
+        addDocs(story.documents, story.name);
+      }
+    }
+
+    for (const story of tree.standaloneStories) {
+      results.push({ id: story.id, name: story.name, kind: "story", breadcrumb: "Story" });
+      addDocs(story.documents, story.name);
+    }
+
+    return results;
+  }, [tree]);
+
+  const filteredResults = useMemo((): SearchResult[] => {
+    if (!searchQuery.trim()) return [];
+    const query = searchQuery.toLowerCase();
+    return searchIndex.filter((result) => result.name.toLowerCase().includes(query)).slice(0, 12);
+  }, [searchIndex, searchQuery]);
+
+  const handleSearchSelect = useCallback((result: SearchResult) => {
+    if (result.href) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      router.push(result.href as any);
+    } else {
+      setActiveId(result.id);
+    }
+    setSearchQuery("");
+  }, [router]);
+
   const SUBCATEGORY_TYPES = new Set(["CHARACTER", "WORLDBUILDING", "SCENE"]);
+
+  const DOC_TYPE_ICONS: Record<string, React.FC<{ className?: string }>> = {
+    CHARACTER: UsersIcon,
+    RELATIONSHIP: HeartLinkIcon,
+    WORLDBUILDING: MountainIcon,
+    PLOT: CompassIcon,
+    SCENE: FileIcon,
+    BRAINSTORM: BrainstormIcon,
+    OTHER: NoteIcon,
+  };
+
+  const docTypeIcon = (type: string): React.FC<{ className?: string }> => DOC_TYPE_ICONS[type] ?? FileIcon;
+
+  // ── Breadcrumbs ─────────────────────────────────────────────────────────────
+
+  const { setCrumbs } = useBreadcrumbs();
+
+  const computedCrumbs = useMemo((): BreadcrumbItem[] => {
+    if (!tree) return [];
+
+    const docMatch = pathname.match(/^\/dashboard\/documents\/([^/]+)$/);
+    const storyMapMatch = pathname.match(/^\/dashboard\/stories\/([^/]+)\/map$/);
+    const universeMapMatch = pathname.match(/^\/dashboard\/universes\/([^/]+)\/map$/);
+
+    if (docMatch) {
+      const docId = docMatch[1];
+      for (const universe of tree.universes) {
+        for (const series of universe.series) {
+          for (const story of series.stories) {
+            const doc = story.documents.find((d) => d.id === docId);
+            if (doc) return [
+              { kind: "universe", label: universe.name },
+              { kind: "series", label: series.name },
+              { kind: "story", label: story.name },
+              { kind: "document", label: doc.name, docType: doc.type },
+            ];
+          }
+          const seriesDoc = series.documents.find((d) => d.id === docId);
+          if (seriesDoc) return [
+            { kind: "universe", label: universe.name },
+            { kind: "series", label: series.name },
+            { kind: "document", label: seriesDoc.name, docType: seriesDoc.type },
+          ];
+        }
+        for (const story of universe.stories) {
+          const doc = story.documents.find((d) => d.id === docId);
+          if (doc) return [
+            { kind: "universe", label: universe.name },
+            { kind: "story", label: story.name },
+            { kind: "document", label: doc.name, docType: doc.type },
+          ];
+        }
+        const universeDoc = universe.documents.find((d) => d.id === docId);
+        if (universeDoc) return [
+          { kind: "universe", label: universe.name },
+          { kind: "document", label: universeDoc.name, docType: universeDoc.type },
+        ];
+      }
+      for (const series of tree.standaloneSeries) {
+        for (const story of series.stories) {
+          const doc = story.documents.find((d) => d.id === docId);
+          if (doc) return [
+            { kind: "series", label: series.name },
+            { kind: "story", label: story.name },
+            { kind: "document", label: doc.name, docType: doc.type },
+          ];
+        }
+        const seriesDoc = series.documents.find((d) => d.id === docId);
+        if (seriesDoc) return [
+          { kind: "series", label: series.name },
+          { kind: "document", label: seriesDoc.name, docType: seriesDoc.type },
+        ];
+      }
+      for (const story of tree.standaloneStories) {
+        const doc = story.documents.find((d) => d.id === docId);
+        if (doc) return [
+          { kind: "story", label: story.name },
+          { kind: "document", label: doc.name, docType: doc.type },
+        ];
+      }
+      return [];
+    }
+
+    if (storyMapMatch) {
+      const storyId = storyMapMatch[1];
+      for (const universe of tree.universes) {
+        for (const series of universe.series) {
+          const story = series.stories.find((s) => s.id === storyId);
+          if (story) return [
+            { kind: "universe", label: universe.name },
+            { kind: "series", label: series.name },
+            { kind: "story", label: story.name },
+          ];
+        }
+        const story = universe.stories.find((s) => s.id === storyId);
+        if (story) return [
+          { kind: "universe", label: universe.name },
+          { kind: "story", label: story.name },
+        ];
+      }
+      for (const series of tree.standaloneSeries) {
+        const story = series.stories.find((s) => s.id === storyId);
+        if (story) return [
+          { kind: "series", label: series.name },
+          { kind: "story", label: story.name },
+        ];
+      }
+      const story = tree.standaloneStories.find((s) => s.id === storyId);
+      if (story) return [{ kind: "story", label: story.name }];
+      return [];
+    }
+
+    if (universeMapMatch) {
+      const universeId = universeMapMatch[1];
+      const universe = tree.universes.find((u) => u.id === universeId);
+      if (universe) return [{ kind: "universe", label: universe.name }];
+      return [];
+    }
+
+    return [];
+  }, [tree, pathname]);
+
+  useEffect(() => {
+    setCrumbs(computedCrumbs);
+  }, [computedCrumbs, setCrumbs]);
 
   const renderDocumentSections = (
     documents: DocumentItem[],
@@ -788,7 +1025,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           <li key={`plot-entry-${plotDoc.id}`} className="group/plot">
             <div
               className={`flex items-center gap-1 rounded px-2 py-1.5 text-sm transition-colors ${
-                isPlotActive ? "bg-accent/10 text-accent" : "text-text-primary hover:bg-background"
+                isPlotActive ? "relative bg-accent/10 text-accent before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:rounded-full before:bg-accent" : "text-text-primary hover:bg-background"
               }`}
               style={{ paddingLeft: `${depth * 12 + 8}px` }}
             >
@@ -806,7 +1043,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                 aria-label="Plot"
                 aria-current={isPlotActive ? "page" : undefined}
               >
-                <FileIcon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
+                <CompassIcon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
                 {!collapsed && <span className="truncate">Plot</span>}
               </Link>
               {!collapsed && (
@@ -878,7 +1115,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           <div className="flex items-center" style={{ paddingRight: "8px" }}>
             <button
               onClick={() => toggleSection(sectionKey)}
-              className={`flex flex-1 items-center gap-1 pb-0.5 pt-2 text-xs font-medium uppercase tracking-wide hover:text-text-primary ${isBrainstormSection ? "text-accent/70" : "text-text-muted"}`}
+              className={`flex flex-1 items-center gap-2 pb-1 pt-3 font-mono text-[9.5px] uppercase tracking-[0.18em] hover:text-text-primary ${isBrainstormSection ? "text-accent/70" : "text-text-muted"}`}
               style={{ paddingLeft: `${depth * 12 + 8}px` }}
               aria-expanded={!isSectionCollapsed}
             >
@@ -887,6 +1124,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                 <BrainstormIcon className="h-3 w-3 shrink-0" />
               )}
               {!collapsed && DOCUMENT_SECTION_LABELS[type]}
+              {!collapsed && !isBrainstormSection && <span className="section-rule" aria-hidden="true" />}
             </button>
             {!collapsed && supportsSubcategories && (
               <button
@@ -1059,7 +1297,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                 href={{ pathname: mapHref }}
                 className={`flex items-center gap-1.5 rounded px-2 py-1.5 text-sm transition-colors ${
                   pathname === mapHref
-                    ? "bg-accent/10 text-accent"
+                    ? "relative bg-accent/10 text-accent before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:rounded-full before:bg-accent"
                     : "text-text-muted hover:bg-background hover:text-text-primary"
                 }`}
                 aria-label={mapAriaLabel}
@@ -1085,7 +1323,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         <div
           className={`group flex items-center gap-1 rounded px-2 py-1.5 text-sm transition-colors ${
             activeId === story.id
-              ? "bg-accent/10 text-accent"
+              ? "relative bg-accent/10 text-accent before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:rounded-full before:bg-accent"
               : "text-text-primary hover:bg-background"
           }`}
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
@@ -1104,7 +1342,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             aria-label={story.name}
           >
             <BookIcon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
-            {!collapsed && <span className="truncate">{story.name}</span>}
+            {!collapsed && <span className="truncate font-heading text-[13.5px]">{story.name}</span>}
           </button>
           {!collapsed && (
             <>
@@ -1163,7 +1401,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         <div
           className={`group flex items-center gap-1 rounded px-2 py-1.5 text-sm transition-colors ${
             activeId === series.id
-              ? "bg-accent/10 text-accent"
+              ? "relative bg-accent/10 text-accent before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:rounded-full before:bg-accent"
               : "text-text-primary hover:bg-background"
           }`}
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
@@ -1190,7 +1428,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           >
             <LayersIcon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
             {!collapsed && (
-              <span className="truncate">{series.name}</span>
+              <span className="truncate font-heading text-[13.5px]">{series.name}</span>
             )}
           </button>
           {!collapsed && (
@@ -1242,7 +1480,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         <div
           className={`group flex items-center gap-1 rounded px-2 py-1.5 text-sm transition-colors ${
             activeId === universe.id
-              ? "bg-accent/10 text-accent"
+              ? "relative bg-accent/10 text-accent before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:rounded-full before:bg-accent"
               : "text-text-primary hover:bg-background"
           }`}
         >
@@ -1264,7 +1502,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           >
             <GlobeIcon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
             {!collapsed && (
-              <span className="truncate font-medium">{universe.name}</span>
+              <span className="truncate font-heading text-[13.5px]">{universe.name}</span>
             )}
           </button>
           {!collapsed && (
@@ -1309,12 +1547,13 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               <li key={`section-stories-${universe.id}`}>
                 <button
                   onClick={() => toggleSection(`${universe.id}-stories`)}
-                  className="flex w-full items-center gap-1 pb-0.5 pt-2 text-xs font-medium uppercase tracking-wide text-text-muted hover:text-text-primary"
+                  className="flex w-full items-center gap-2 pb-1 pt-3 font-mono text-[9.5px] uppercase tracking-[0.18em] text-text-muted hover:text-text-primary"
                   style={{ paddingLeft: "20px" }}
                   aria-expanded={!collapsedSections.has(`${universe.id}-stories`)}
                 >
                   {!collapsed && <ChevronIcon expanded={!collapsedSections.has(`${universe.id}-stories`)} className="h-2.5 w-2.5 shrink-0" />}
-                  Stories
+                  {!collapsed && "Stories"}
+                  {!collapsed && <span className="section-rule" aria-hidden="true" />}
                 </button>
               </li>
             )}
@@ -1336,42 +1575,103 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const sidebarContent = (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex h-14 items-center justify-between border-b border-border px-3">
-        {!collapsed && (
-          <span className="font-heading text-base font-bold text-text-primary">
-            Writing Buddy
-          </span>
+      <div className={`px-4 py-3 ${collapsed ? "flex justify-center" : ""}`}>
+        {collapsed ? (
+          <div className="wordmark-mark cursor-pointer" onClick={toggleCollapsed} role="button" aria-label="Expand sidebar" />
+        ) : (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="wordmark-mark" aria-hidden="true" />
+              <div>
+                <div className="font-heading text-[17px] font-medium text-text-primary leading-tight">Writing Buddy</div>
+                <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-text-muted block">a quiet desk</span>
+              </div>
+            </div>
+            <button
+              onClick={toggleCollapsed}
+              className="shrink-0 rounded-lg p-1.5 text-text-muted hover:bg-surface-2"
+              aria-label="Collapse sidebar"
+              data-testid="sidebar-collapse-btn"
+            >
+              <CollapseIcon collapsed={collapsed} className="h-4 w-4" />
+            </button>
+          </div>
         )}
-        <button
-          onClick={toggleCollapsed}
-          className={`shrink-0 rounded p-1.5 text-text-muted hover:bg-background ${collapsed ? "mx-auto" : ""}`}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          data-testid="sidebar-collapse-btn"
-        >
-          <CollapseIcon collapsed={collapsed} className="h-4 w-4" />
-        </button>
       </div>
 
-      {/* New Project button */}
-      <div className="border-b border-border p-2">
+      {/* Search + New Project */}
+      {!collapsed && (
+        <div className="px-3 pt-2 pb-1 relative">
+          <SearchIcon className="absolute left-5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted" aria-hidden="true" />
+          <input
+            ref={searchInputRef}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") { setSearchQuery(""); e.currentTarget.blur(); }
+            }}
+            placeholder="Search anything…"
+            className="w-full h-8 rounded-lg border border-border bg-paper pl-8 pr-10 text-[12.5px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-soft focus:ring-2 focus:ring-accent/10"
+            aria-label="Search projects and documents"
+            aria-autocomplete="list"
+            aria-controls={searchQuery ? "search-results" : undefined}
+            aria-expanded={filteredResults.length > 0}
+          />
+          {!searchQuery && (
+            <kbd className="absolute right-5 top-1/2 -translate-y-1/2 font-mono text-[10px] text-text-muted bg-surface-2 px-1.5 py-0.5 rounded border border-border" aria-label="Keyboard shortcut: Command K">⌘K</kbd>
+          )}
+        </div>
+      )}
+      <div className={`px-3 pt-1 pb-3 ${collapsed ? "flex justify-center" : ""}`}>
         <button
           onClick={() => setNewProjectModal(true)}
-          className={`flex w-full items-center gap-2 rounded px-2 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/10 ${collapsed ? "justify-center" : ""}`}
+          className={`flex items-center gap-2 rounded-full bg-accent px-4 py-2.5 text-[13px] font-medium text-[#FBF1E5] shadow-sm transition hover:-translate-y-px hover:bg-accent-deep ${collapsed ? "w-10 h-10 justify-center px-0 rounded-xl" : "w-full justify-center"}`}
           aria-label="New project"
           data-testid="new-project-btn"
         >
-          <PlusIcon className="h-4 w-4 shrink-0" />
-          {!collapsed && <span>New Project</span>}
+          <PlusIcon className="h-3.5 w-3.5 shrink-0" />
+          {!collapsed && <span>New project</span>}
         </button>
       </div>
 
-      {/* Tree */}
+      {/* Tree / Search Results */}
       <nav
         className="flex-1 overflow-y-auto p-2"
-        aria-label="Project tree"
+        aria-label={searchQuery ? "Search results" : "Project tree"}
         data-testid="project-tree"
       >
-        {tree === null ? (
+        {searchQuery ? (
+          filteredResults.length === 0 ? (
+            <p className="px-2 py-4 text-xs text-text-muted">No results for &ldquo;{searchQuery}&rdquo;</p>
+          ) : (
+            <ul id="search-results" className="space-y-0.5" role="listbox">
+              {filteredResults.map((result) => {
+                const KindIcon =
+                  result.kind === "universe" ? GlobeIcon
+                  : result.kind === "series" ? LayersIcon
+                  : result.kind === "story" ? BookIcon
+                  : FileIcon;
+                const typeLabel = result.docType ? DOCUMENT_TYPE_LABELS[result.docType as keyof typeof DOCUMENT_TYPE_LABELS] : undefined;
+                return (
+                  <li key={result.id} role="option" aria-selected={activeId === result.id}>
+                    <button
+                      onClick={() => handleSearchSelect(result)}
+                      className={`group flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent/10 hover:text-accent ${
+                        activeId === result.id ? "relative bg-accent/10 text-accent before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:rounded-full before:bg-accent" : "text-text-primary"
+                      }`}
+                    >
+                      <KindIcon className="h-3.5 w-3.5 shrink-0 text-text-muted group-hover:text-accent" />
+                      <span className="flex-1 truncate">{result.name}</span>
+                      <span className="shrink-0 truncate text-[10.5px] text-text-muted">
+                        {typeLabel ?? result.breadcrumb}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )
+        ) : tree === null ? (
           <div className="space-y-1.5 p-2">
             {[1, 2, 3].map((i) => (
               <div
@@ -1400,7 +1700,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       <div className="border-t border-border p-2">
         <Link
           href={{ pathname: "/dashboard/brainstorm" }}
-          className={`flex items-center gap-2 rounded px-2 py-2 text-sm text-text-muted transition-colors hover:bg-background hover:text-text-primary ${collapsed ? "justify-center" : ""}`}
+          className={`flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-text-muted transition-colors hover:bg-surface-2 hover:text-text-primary ${collapsed ? "justify-center" : ""}`}
           aria-label="Brainstorm"
           data-testid="brainstorm-link"
         >
@@ -1409,7 +1709,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         </Link>
         <Link
           href={{ pathname: "/dashboard/prompts" }}
-          className={`flex items-center gap-2 rounded px-2 py-2 text-sm text-text-muted transition-colors hover:bg-background hover:text-text-primary ${collapsed ? "justify-center" : ""}`}
+          className={`flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-text-muted transition-colors hover:bg-surface-2 hover:text-text-primary ${collapsed ? "justify-center" : ""}`}
           aria-label="Saved Prompts"
           data-testid="prompts-link"
         >
@@ -1418,12 +1718,50 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         </Link>
         <Link
           href="/settings"
-          className={`flex items-center gap-2 rounded px-2 py-2 text-sm text-text-muted transition-colors hover:bg-background hover:text-text-primary ${collapsed ? "justify-center" : ""}`}
+          className={`flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-text-muted transition-colors hover:bg-surface-2 hover:text-text-primary ${collapsed ? "justify-center" : ""}`}
           aria-label="Settings"
         >
           <SettingsIcon className="h-4 w-4 shrink-0" />
           {!collapsed && <span>Settings</span>}
         </Link>
+        {!collapsed && (
+          <div className="relative mt-2" ref={userMenuRef}>
+            <button
+              onClick={() => setUserMenuOpen((prev) => !prev)}
+              className="flex w-full items-center gap-2.5 rounded-xl bg-surface-2 p-2 text-left hover:bg-background transition-colors"
+              aria-haspopup="menu"
+              aria-expanded={userMenuOpen}
+              aria-label="User menu"
+            >
+              <div
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-medium text-[#FBF1E5]"
+                style={{ background: "linear-gradient(135deg, var(--gold), var(--accent))" }}
+                aria-hidden="true"
+              >
+                {displayName.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[12.5px] text-text-primary">{displayName}</div>
+                <div className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-text-muted">Writer</div>
+              </div>
+              <CollapseIcon collapsed={false} className={`h-3.5 w-3.5 shrink-0 text-text-muted transition-transform ${userMenuOpen ? "" : "rotate-180"}`} />
+            </button>
+            {userMenuOpen && (
+              <div
+                role="menu"
+                className="absolute bottom-full left-0 right-0 mb-1 rounded-lg border border-border bg-surface shadow-lg py-1"
+              >
+                <button
+                  role="menuitem"
+                  onClick={() => void signOut({ callbackUrl: "/signin" })}
+                  className="flex w-full items-center px-3 py-2 text-[13px] text-red-600 hover:bg-background transition-colors"
+                >
+                  Sign out
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
