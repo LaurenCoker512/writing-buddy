@@ -38,13 +38,25 @@ export async function PATCH(req: NextRequest, { params }: RouteParams<{ id: stri
 
   const body = (await req.json()) as Record<string, unknown>;
   const result = buildHierarchyPatchData(body);
-  if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: result.status });
+
+  const patchData: Record<string, unknown> = result.ok ? { ...result.data } : {};
+
+  if ("seriesId" in body) {
+    patchData.seriesId =
+      typeof body.seriesId === "string" && body.seriesId !== "" ? body.seriesId : null;
+  }
+  if ("universeId" in body) {
+    patchData.universeId =
+      typeof body.universeId === "string" && body.universeId !== "" ? body.universeId : null;
+  }
+
+  if (Object.keys(patchData).length === 0) {
+    return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
   }
 
   const updated = await prisma.story.update({
     where: { id },
-    data: result.data,
+    data: patchData,
   });
 
   return NextResponse.json(updated);

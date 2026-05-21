@@ -189,6 +189,121 @@ export function DeleteModal({
   );
 }
 
+// ── Move Story Modal ──────────────────────────────────────────────────────────
+
+export interface MoveStoryState {
+  id: string;
+  name: string;
+  currentSeriesId: string | null;
+  currentUniverseId: string | null;
+}
+
+export function MoveStoryModal({
+  modal,
+  tree,
+  onConfirm,
+  onClose,
+}: {
+  modal: MoveStoryState;
+  tree: ProjectTree;
+  onConfirm: (seriesId: string | null, universeId: string | null) => Promise<void>;
+  onClose: () => void;
+}) {
+  const enrichedSeries = [
+    ...tree.universes.flatMap((u) => u.series.map((s) => ({ ...s, universeId: u.id as string | null }))),
+    ...tree.standaloneSeries.map((s) => ({ ...s, universeId: null as string | null })),
+  ];
+
+  const [universeId, setUniverseId] = useState(modal.currentUniverseId ?? "");
+  const [seriesId, setSeriesId] = useState(modal.currentSeriesId ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const filteredSeries = universeId
+    ? enrichedSeries.filter((s) => s.universeId === universeId)
+    : enrichedSeries;
+
+  const handleSeriesChange = (newSeriesId: string) => {
+    setSeriesId(newSeriesId);
+    if (newSeriesId) {
+      const matched = enrichedSeries.find((s) => s.id === newSeriesId);
+      setUniverseId(matched?.universeId ?? "");
+    }
+  };
+
+  const submit = async () => {
+    setSaving(true);
+    try {
+      await onConfirm(seriesId || null, universeId || null);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const selectClass =
+    "w-full rounded border border-border bg-background px-3 py-2 text-sm text-text-primary outline-none focus:ring-2 focus:ring-accent";
+
+  return (
+    <Modal title={`Move "${modal.name}"`} onClose={onClose}>
+      {tree.universes.length > 0 && (
+        <div className="mb-4">
+          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-text-muted">
+            Universe (optional)
+          </label>
+          <select
+            value={universeId}
+            onChange={(e) => {
+              setUniverseId(e.target.value);
+              setSeriesId("");
+            }}
+            className={selectClass}
+          >
+            <option value="">— None —</option>
+            {tree.universes.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      {enrichedSeries.length > 0 && (
+        <div className="mb-6">
+          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-text-muted">
+            Series (optional)
+          </label>
+          <select
+            value={seriesId}
+            onChange={(e) => handleSeriesChange(e.target.value)}
+            className={selectClass}
+          >
+            <option value="">— None —</option>
+            {filteredSeries.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={onClose}
+          className="rounded border border-border px-4 py-2 text-sm text-text-muted hover:bg-background"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => void submit()}
+          disabled={saving}
+          className="rounded bg-accent px-4 py-2 text-sm text-white hover:bg-accent-hover disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Move"}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
 // ── New Project Modal ─────────────────────────────────────────────────────────
 
 export function NewProjectModal({

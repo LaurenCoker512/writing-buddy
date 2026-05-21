@@ -39,9 +39,11 @@ import {
   DeleteModal,
   NewProjectModal,
   NewDocumentModal,
+  MoveStoryModal,
   type ModalState,
   type CreateData,
   type NewDocumentState,
+  type MoveStoryState,
 } from "@/components/sidebar/SidebarModals";
 import {
   GlobeIcon,
@@ -96,6 +98,7 @@ function ContextMenuDropdown({
   onImportCanon,
   onCheckContradictions,
   onSetSubcategory,
+  onMove,
 }: {
   menu: ContextMenuState;
   onRename: () => void;
@@ -104,6 +107,7 @@ function ContextMenuDropdown({
   onImportCanon?: () => void;
   onCheckContradictions?: () => void;
   onSetSubcategory?: (subcategoryId: string | null) => void;
+  onMove?: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -141,6 +145,11 @@ function ContextMenuDropdown({
       {menu.type === "story" && onCheckContradictions !== undefined && (
         <button role="menuitem" className={menuItemClass} onClick={onCheckContradictions}>
           Check for Contradictions
+        </button>
+      )}
+      {menu.type === "story" && onMove !== undefined && (
+        <button role="menuitem" className={menuItemClass} onClick={onMove}>
+          Move to…
         </button>
       )}
       {menu.type === "document" && (
@@ -380,6 +389,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const [newDocumentModal, setNewDocumentModal] = useState<NewDocumentState | null>(null);
   const [canonIngestionModal, setCanonIngestionModal] = useState<CanonIngestionState | null>(null);
   const [contradictionModal, setContradictionModal] = useState<{ storyId: string; storyName: string } | null>(null);
+  const [moveStoryModal, setMoveStoryModal] = useState<MoveStoryState | null>(null);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [newSubcategoryState, setNewSubcategoryState] = useState<NewSubcategoryState | null>(null);
 
@@ -528,6 +538,17 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     if (shouldRedirect) {
       router.push("/dashboard");
     }
+  };
+
+  const handleMoveStory = async (seriesId: string | null, universeId: string | null) => {
+    if (!moveStoryModal) return;
+    await fetch(`/api/stories/${moveStoryModal.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seriesId, universeId }),
+    });
+    setMoveStoryModal(null);
+    void fetchTree();
   };
 
   const handleCreate = async (data: CreateData) => {
@@ -1099,7 +1120,12 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                 <PlusIcon className="h-3.5 w-3.5" />
               </button>
               <button
-                onClick={(e) => openContextMenu(e, story.id, "story", story.name)}
+                onClick={(e) =>
+                  openContextMenu(e, story.id, "story", story.name, {
+                    seriesId: story.seriesId,
+                    universeId: story.universeId,
+                  })
+                }
                 className="opacity-0 shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:opacity-100 focus:opacity-100"
                 aria-label={`Options for ${story.name}`}
                 data-testid={`story-menu-${story.id}`}
@@ -1472,6 +1498,25 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                 }
               : undefined
           }
+          onMove={
+            contextMenu.type === "story"
+              ? () => {
+                  setMoveStoryModal({
+                    id: contextMenu.id,
+                    name: contextMenu.name,
+                    currentSeriesId:
+                      typeof contextMenu.meta?.seriesId === "string"
+                        ? contextMenu.meta.seriesId
+                        : null,
+                    currentUniverseId:
+                      typeof contextMenu.meta?.universeId === "string"
+                        ? contextMenu.meta.universeId
+                        : null,
+                  });
+                  setContextMenu(null);
+                }
+              : undefined
+          }
         />
       )}
 
@@ -1533,6 +1578,16 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           storyId={contradictionModal.storyId}
           storyName={contradictionModal.storyName}
           onClose={() => setContradictionModal(null)}
+        />
+      )}
+
+      {/* Move story modal */}
+      {moveStoryModal !== null && tree !== null && (
+        <MoveStoryModal
+          modal={moveStoryModal}
+          tree={tree}
+          onConfirm={handleMoveStory}
+          onClose={() => setMoveStoryModal(null)}
         />
       )}
     </>
