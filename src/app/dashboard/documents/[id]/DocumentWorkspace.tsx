@@ -141,7 +141,7 @@ export default function DocumentWorkspace({
 
   const editorPanel = (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 flex-col border-b border-border bg-surface px-6 py-4">
+      <div className="flex shrink-0 flex-col bg-surface px-6 py-4">
         <div className="flex items-baseline gap-3">
           <h1 className="font-heading text-xl font-semibold text-text-primary">
             {documentName}
@@ -338,7 +338,7 @@ export default function DocumentWorkspace({
       )}
 
       {/* Keep TipTapEditor mounted while a parent view is active to preserve unsaved state */}
-      <div className={`flex-1 overflow-auto ${activeViewId !== null ? "hidden" : ""}`}>
+      <div className={`flex-1 overflow-auto border-t border-border ${activeViewId !== null ? "hidden" : ""}`}>
         <TipTapEditor
           documentId={documentId}
           initialJson={initialJson}

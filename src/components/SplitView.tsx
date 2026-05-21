@@ -110,7 +110,7 @@ export default function SplitView({ left, right }: SplitViewProps) {
           onPointerDown={onDividerPointerDown}
           onPointerMove={onDividerPointerMove}
           onPointerUp={onDividerPointerUp}
-          className="hidden w-1 shrink-0 cursor-col-resize bg-border transition-colors hover:bg-accent/40 lg:block"
+          className="hidden w-px shrink-0 cursor-col-resize bg-border transition-colors hover:bg-accent/40 lg:block"
         />
 
         {/* AI Chat panel */}

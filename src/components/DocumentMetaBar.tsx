@@ -64,7 +64,7 @@ export default function DocumentMetaBar({
   if (documentType === "CHARACTER") {
     const characterMeta = meta as CharacterMeta;
     return (
-      <div className="flex shrink-0 items-center gap-4 border-b border-border bg-surface px-6 py-2">
+      <div className="flex shrink-0 items-center gap-4 bg-surface px-6 py-2">
         <label className={labelClass} htmlFor="character-role">
           Role
           <select
@@ -106,7 +106,7 @@ export default function DocumentMetaBar({
     };
 
     return (
-      <div className="flex shrink-0 flex-wrap items-center gap-4 border-b border-border bg-surface px-6 py-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-4 bg-surface px-6 py-2">
         <label className={labelClass} htmlFor="relationship-type">
           Type
           <select
@@ -178,7 +178,7 @@ export default function DocumentMetaBar({
   if (documentType === "WORLDBUILDING") {
     const wbMeta = meta as WorldbuildingMeta;
     return (
-      <div className="flex shrink-0 items-center gap-4 border-b border-border bg-surface px-6 py-2">
+      <div className="flex shrink-0 items-center gap-4 bg-surface px-6 py-2">
         <label className={labelClass} htmlFor="worldbuilding-category">
           Category
           <select

@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { DiffProposal } from "@/types/diff";
 import { parseInlineBadges } from "@/lib/canon-badge";
 import { DOCUMENT_TYPE_LABELS } from "@/lib/documents";
-import { TrashIcon } from "@/components/icons";
+import { TrashIcon, FeatherIcon, SendIcon } from "@/components/icons";
 import ContextPickerModal from "@/components/ContextPickerModal";
 
 type CollabContextDoc = { id: string; name: string; type: string };
@@ -14,6 +14,7 @@ type ChatMessage = { kind: "message"; key: string; id?: string; role: "user" | "
 type ChatItem = ChatMessage;
 
 const MESSAGE_COLLAPSE_THRESHOLD = 400;
+
 
 interface ChatPanelProps {
   documentId: string;
@@ -26,12 +27,19 @@ interface ChatPanelProps {
 function ThinkingSpinner() {
   return (
     <div className="flex justify-start">
-      <div className="rounded-2xl border border-border bg-surface px-4 py-3">
-        <span
-          className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-text-muted border-t-transparent"
-          aria-label="Waiting for response"
-          role="status"
-        />
+      <div className="flex items-center gap-2.5 rounded-2xl border border-border px-4 py-3" style={{ backgroundColor: "var(--paper)" }}>
+        <div className="flex gap-1" aria-label="Margin is thinking" role="status">
+          {[0, 150, 300].map((delay) => (
+            <span
+              key={delay}
+              className="h-1.5 w-1.5 rounded-full"
+              style={{
+                backgroundColor: "var(--muted-2)",
+                animation: `bob 1.2s ease-in-out ${delay}ms infinite`,
+              }}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -84,6 +92,7 @@ export default function ChatPanel({
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const [contextDocs, setContextDocs] = useState<CollabContextDoc[]>([]);
   const [showContextModal, setShowContextModal] = useState(false);
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const keyCounter = useRef(0);
 
@@ -204,11 +213,21 @@ export default function ChatPanel({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="shrink-0 border-b border-border bg-surface px-6 py-4">
-        <h2 className="flex items-center gap-2 font-heading text-lg font-semibold text-text-primary">
-          <span className="text-accent-ai" aria-hidden="true">✦</span>
-          AI Collab
-        </h2>
+      {/* Margin persona header */}
+      <div className="shrink-0 border-b border-border px-5 py-4" style={{ backgroundColor: "var(--surface)" }}>
+        <div className="flex items-center gap-2.5">
+          <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]" style={{ background: "linear-gradient(140deg, var(--ai-soft), var(--ai))" }}>
+            <FeatherIcon className="h-4 w-4 text-white" />
+            <span className="pulse-dot absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface" style={{ backgroundColor: "var(--ai)" }} aria-hidden="true" />
+          </div>
+          <div>
+            <div className="font-heading text-[16px] font-medium leading-tight text-text-primary">Margin</div>
+            <div className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-text-muted">Co-writer · listening</div>
+          </div>
+        </div>
+        <p className="mt-2.5 font-heading italic text-[13.5px] leading-relaxed text-text-soft">
+          Ask me anything about your document, or give an edit instruction.
+        </p>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
@@ -263,11 +282,12 @@ export default function ChatPanel({
                 >
                   {item.role === "user" && deleteBtn}
                   <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${
+                    className={`max-w-[82%] rounded-2xl px-4 py-2.5 text-[13px] leading-relaxed ${
                       item.role === "user"
-                        ? "bg-accent text-white"
-                        : "border border-border bg-surface text-text-primary"
+                        ? "rounded-br-sm text-[#FBF1E5]"
+                        : "border border-border text-text-primary"
                     }`}
+                    style={item.role === "user" ? { backgroundColor: "var(--accent)" } : { backgroundColor: "var(--paper)" }}
                   >
                     <div className={isLong && !isExpanded ? "max-h-40 overflow-hidden" : undefined}>
                       {item.role === "assistant" ? (
@@ -299,46 +319,17 @@ export default function ChatPanel({
         <div ref={bottomRef} />
       </div>
 
-      <div className="shrink-0 border-t border-border p-4">
-        <div className="flex items-end gap-2">
-          <textarea
-            className="flex-1 resize-none rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent"
-            placeholder="Ask anything or give an edit instruction…"
-            rows={2}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void sendMessage();
-              }
-            }}
-            disabled={isStreaming}
-            aria-label="Message input"
-          />
-          <button
-            onClick={() => void sendMessage()}
-            disabled={isStreaming || !input.trim()}
-            className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label="Send message"
-          >
-            Send
-          </button>
-        </div>
-
+      {/* Composer */}
+      <div className="shrink-0 border-t border-border p-3.5" style={{ backgroundColor: "var(--surface)" }}>
         {/* Context chips */}
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="flex items-center rounded-full border border-border bg-surface px-2.5 py-1 text-xs text-text-muted">
+        <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
+          <span className="flex items-center rounded-full border border-accent-soft px-2.5 py-1 text-xs font-medium" style={{ backgroundColor: "var(--ai-soft)", color: "var(--ai-deep)" }}>
             Current document
           </span>
-
           {contextDocs.map((doc) => {
             const typeLabel = DOCUMENT_TYPE_LABELS[doc.type as keyof typeof DOCUMENT_TYPE_LABELS] ?? doc.type;
             return (
-              <span
-                key={doc.id}
-                className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs text-text-primary"
-              >
+              <span key={doc.id} className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-text-primary" style={{ backgroundColor: "var(--paper)" }}>
                 <span className="text-text-muted">{typeLabel}</span>
                 {doc.name}
                 <button
@@ -351,13 +342,43 @@ export default function ChatPanel({
               </span>
             );
           })}
-
           <button
             onClick={() => setShowContextModal(true)}
-            className="rounded-full border border-dashed border-border px-2.5 py-1 text-xs text-text-muted transition-colors hover:text-text-primary"
+            className="rounded-full border border-dashed border-accent-ai px-2.5 py-1 text-xs transition hover:bg-accent-ai-soft"
+            style={{ color: "var(--ai-deep)" }}
           >
             + Add context
           </button>
+        </div>
+
+        {/* Textarea wrapper + tone pills + send button */}
+        <div className="rounded-2xl border border-border p-2 transition focus-within:border-accent-ai focus-within:ring-2 focus-within:ring-accent-ai/20" style={{ backgroundColor: "var(--paper)" }}>
+          <textarea
+            className="w-full resize-none border-0 bg-transparent px-1 py-0.5 text-[13px] leading-relaxed text-text-primary placeholder:font-heading placeholder:italic placeholder:text-text-muted focus:outline-none"
+            placeholder="Tell Margin what you're stuck on…"
+            rows={2}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void sendMessage();
+              }
+            }}
+            disabled={isStreaming}
+            aria-label="Message input"
+          />
+          <div className="flex items-center gap-1.5 pt-1">
+            <button
+              onClick={() => void sendMessage()}
+              disabled={isStreaming || !input.trim()}
+              className="ml-auto inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[12px] font-medium text-white shadow-sm transition hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ backgroundColor: "var(--ai)" }}
+              aria-label="Send message"
+            >
+              <SendIcon className="h-3 w-3" /> Send
+            </button>
+          </div>
         </div>
       </div>
 

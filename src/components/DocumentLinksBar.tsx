@@ -62,7 +62,7 @@ export default function DocumentLinksBar({
     if (relationships.length === 0) return null;
 
     return (
-      <div className="shrink-0 border-b border-border bg-surface px-6 py-2">
+      <div className="shrink-0 bg-surface px-6 py-2">
         <span className="mr-3 text-xs font-medium text-text-muted">Relationships</span>
         <span className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
           {relationships.map((rel) => {
@@ -108,7 +108,7 @@ export default function DocumentLinksBar({
     if (linkedChars.length === 0) return null;
 
     return (
-      <div className="shrink-0 border-b border-border bg-surface px-6 py-2">
+      <div className="shrink-0 bg-surface px-6 py-2">
         <span className="mr-3 text-xs font-medium text-text-muted">Characters</span>
         <span className="inline-flex flex-wrap gap-x-3 gap-y-1 mt-1">
           {linkedChars.map((char) => (
