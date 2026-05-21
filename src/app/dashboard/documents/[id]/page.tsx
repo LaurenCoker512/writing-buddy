@@ -59,6 +59,11 @@ export default async function DocumentPage({ params }: Props) {
       ? (document.meta as Record<string, unknown>)
       : null;
 
+  const seriesId =
+    document.seriesId ??
+    document.story?.seriesId ??
+    null;
+
   const universeId =
     document.universeId ??
     document.story?.universeId ??
@@ -148,7 +153,7 @@ export default async function DocumentPage({ params }: Props) {
       initialJson={tiptapJson}
       initialMeta={initialMeta}
       storyId={document.storyId}
-      seriesId={document.seriesId}
+      seriesId={seriesId}
       universeId={universeId}
       parentDocumentId={document.parentDocumentId}
       parentDocumentName={document.parent?.name ?? null}

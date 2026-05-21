@@ -13,10 +13,14 @@ import { shouldPruneChatMessages } from "@/lib/chat-pruning";
 import { resolveProviderForUser, stripJsonFences } from "@/lib/ai-provider";
 import type { ProviderAdapter } from "@/lib/ai-provider";
 import { findOwnedDocument } from "@/lib/db-helpers";
+import { DOCUMENT_TYPE_LABELS } from "@/lib/documents";
+import type { DocumentTypeValue } from "@/lib/documents";
 
 const UNIFIED_SYSTEM_PROMPT = `You are an AI writing assistant helping a writer develop their story documents. First determine whether the user's message is requesting a document edit or asking a question/discussing the document.
 
 Be proactive and confident. Use the document content, your knowledge of the source material (for fanfic or adaptation work), and reasonable creative judgment to complete tasks directly — do not ask clarifying questions when you have enough to work with. If the document provides context, treat it as sufficient. Make your best attempt and the writer can refine from there.
+
+Documents exist at three scope levels, from most specific to most general: Story → Series → Universe. When context documents from multiple scopes are provided, give higher precedence to the more specific (lower) scope. A Story-level document overrides a Series-level document, which overrides a Universe-level document. This is intentional: the writer may be using a fanfic universe with established canon at the Universe level, adapting that canon at the Series level, and then making story-specific choices at the Story level. Always prefer the most specific version available when there are conflicts.
 
 Return ONLY valid JSON (no markdown fences, no explanation) in one of these two formats:
 
@@ -49,6 +53,25 @@ Edit rules:
 - Preserve content in sections you are not asked to change
 
 Return valid JSON only — no other text.`;
+
+type ScopedDoc = Awaited<ReturnType<typeof findOwnedDocument>> & object;
+
+function documentScopeLabel(doc: { storyId: string | null; seriesId: string | null }): "Story" | "Series" | "Universe" {
+  if (doc.storyId !== null) return "Story";
+  if (doc.seriesId !== null) return "Series";
+  return "Universe";
+}
+
+function documentTypeLabel(type: string): string {
+  return DOCUMENT_TYPE_LABELS[type as DocumentTypeValue] ?? type;
+}
+
+function formatContextDoc(doc: ScopedDoc): string {
+  const scope = documentScopeLabel(doc);
+  const typeLabel = documentTypeLabel(doc.type);
+  const markdown = tiptapToMarkdown(doc.tiptapJson as TipTapNode);
+  return `[${scope}-level ${typeLabel}] ${doc.name}\n\n${markdown}`;
+}
 
 interface AiDiffItem {
   heading: unknown;
@@ -173,12 +196,14 @@ export async function POST(req: NextRequest) {
   }
 
   const additionalDocsMarkdown = additionalDocs
-    .map((d) => tiptapToMarkdown(d.tiptapJson as TipTapNode))
+    .map((d) => formatContextDoc(d as ScopedDoc))
     .filter((md) => md.length > 0)
     .join("\n\n---\n\n");
 
   const tiptapDoc = document.tiptapJson as TipTapDoc;
   const documentMarkdown = tiptapToMarkdown(tiptapDoc as TipTapNode);
+  const primaryScope = documentScopeLabel(document);
+  const primaryTypeLabel = documentTypeLabel(document.type);
 
   const dbMessages = await prisma.chatMessage.findMany({
     where: { documentId: body.documentId },
@@ -192,9 +217,9 @@ export async function POST(req: NextRequest) {
 
   const { recentMessages } = buildTier1Context(document.tiptapJson as TipTapNode, chatMessages);
 
-  let userMessage = `Document:\n${documentMarkdown || "(empty document)"}`;
+  let userMessage = `You are working on a ${primaryScope}-level ${primaryTypeLabel} document titled "${document.name}".\n\nDocument:\n${documentMarkdown || "(empty document)"}`;
   if (additionalDocsMarkdown) {
-    userMessage += `\n\nAdditional context documents:\n\n${additionalDocsMarkdown}`;
+    userMessage += `\n\nAdditional context documents (each labeled with its scope level):\n\n${additionalDocsMarkdown}`;
   }
   userMessage += `\n\nMessage: ${body.content}`;
 
