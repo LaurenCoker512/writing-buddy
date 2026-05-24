@@ -147,6 +147,7 @@ export default async function DocumentPage({ params }: Props) {
 
   return (
     <DocumentWorkspace
+      key={document.id}
       documentId={document.id}
       documentName={document.name}
       documentType={document.type}
