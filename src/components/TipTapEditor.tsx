@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useEditor, useEditorState, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
+import CharacterCount from "@tiptap/extension-character-count";
 import { Table } from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
@@ -279,6 +280,7 @@ export default function TipTapEditor({
       TableCell,
       TrackedInsert,
       TrackedDelete,
+      CharacterCount,
     ],
     content: initialJson,
     onUpdate({ editor: ed }) {
@@ -372,6 +374,11 @@ export default function TipTapEditor({
         <SaveIndicator status={saveStatus} />
       </div>
       <EditorContent editor={editor} data-testid="tiptap-editor" />
+      {editor && (
+        <p className="mt-6 text-right font-mono text-[10px] uppercase tracking-widest text-text-muted/60" aria-live="polite" aria-label="Word count">
+          {editor.storage.characterCount.words()} words
+        </p>
+      )}
       {activeProposalId !== null && toolbarAnchor !== null && (
         <div
           role="toolbar"
