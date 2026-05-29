@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { DOCUMENT_TYPE_LABELS } from "@/lib/documents";
 import type { DocumentTypeValue } from "@/lib/documents";
 import SplitView from "@/components/SplitView";
@@ -64,7 +65,14 @@ export default function DocumentWorkspace({
   currentLabel,
   plotDocId,
 }: DocumentWorkspaceProps) {
+  const router = useRouter();
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+
+  useEffect(() => {
+    if (saveStatus === "saved") {
+      router.refresh();
+    }
+  }, [saveStatus, router]);
   const [externalContent, setExternalContent] = useState<
     { json: object; nonce: number } | undefined
   >();

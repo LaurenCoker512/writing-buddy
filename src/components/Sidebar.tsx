@@ -386,6 +386,180 @@ function SortableSceneList({
   );
 }
 
+function SortableStoryItem({
+  story,
+  depth,
+  isActive,
+  isExpanded,
+  collapsed,
+  onToggleExpanded,
+  onSetActive,
+  onAddDocument,
+  onContextMenu,
+  children,
+}: {
+  story: StoryItem;
+  depth: number;
+  isActive: boolean;
+  isExpanded: boolean;
+  collapsed: boolean;
+  onToggleExpanded: () => void;
+  onSetActive: () => void;
+  onAddDocument: (e: React.MouseEvent) => void;
+  onContextMenu: (e: React.MouseEvent) => void;
+  children?: React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: story.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
+
+  return (
+    <li ref={setNodeRef} style={style} {...attributes}>
+      <div
+        className={`group flex items-center gap-1 rounded px-2 py-1.5 text-sm transition-colors ${
+          isActive
+            ? "relative bg-accent/10 text-accent before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:rounded-full before:bg-accent"
+            : "text-text-primary hover:bg-background"
+        }`}
+        style={{ paddingLeft: `${depth * 12 + 8}px` }}
+      >
+        {!collapsed && (
+          <button
+            {...listeners}
+            className="shrink-0 cursor-grab text-text-muted opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing"
+            aria-label={`Drag to reorder ${story.name}`}
+            tabIndex={-1}
+          >
+            <GripIcon className="h-3 w-3" />
+          </button>
+        )}
+        <button
+          onClick={onToggleExpanded}
+          className="shrink-0 text-text-muted"
+          aria-label={isExpanded ? "Collapse" : "Expand"}
+        >
+          <ChevronIcon expanded={isExpanded} className="h-3 w-3" />
+        </button>
+        <button
+          onClick={onSetActive}
+          className="flex flex-1 items-center gap-1.5 truncate"
+          data-testid={`story-node-${story.id}`}
+          aria-label={story.name}
+        >
+          <BookIcon className="h-3.5 w-3.5 shrink-0 text-text-muted" />
+          {!collapsed && <span className="truncate font-heading text-[13.5px]">{story.name}</span>}
+        </button>
+        {!collapsed && (
+          <>
+            <button
+              onClick={onAddDocument}
+              className="opacity-0 shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:opacity-100 focus:opacity-100"
+              aria-label={`Add document to ${story.name}`}
+              data-testid={`story-add-doc-${story.id}`}
+            >
+              <PlusIcon className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={onContextMenu}
+              className="opacity-0 shrink-0 rounded p-0.5 text-text-muted hover:bg-border group-hover:opacity-100 focus:opacity-100"
+              aria-label={`Options for ${story.name}`}
+              data-testid={`story-menu-${story.id}`}
+            >
+              <DotsIcon className="h-3.5 w-3.5" />
+            </button>
+          </>
+        )}
+      </div>
+      {isExpanded && children}
+    </li>
+  );
+}
+
+function SortableStoryList({
+  stories: initialStories,
+  depth,
+  collapsed,
+  activeId,
+  expandedIds,
+  onToggleExpanded,
+  onSetActive,
+  onAddDocument,
+  onContextMenu,
+  renderChildren,
+}: {
+  stories: StoryItem[];
+  depth: number;
+  collapsed: boolean;
+  activeId: string | null;
+  expandedIds: Set<string>;
+  onToggleExpanded: (storyId: string) => void;
+  onSetActive: (storyId: string) => void;
+  onAddDocument: (e: React.MouseEvent, story: StoryItem) => void;
+  onContextMenu: (e: React.MouseEvent, story: StoryItem) => void;
+  renderChildren: (story: StoryItem) => React.ReactNode;
+}) {
+  const [stories, setStories] = useState(initialStories);
+
+  useEffect(() => {
+    setStories(initialStories);
+  }, [initialStories]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = stories.findIndex((s) => s.id === active.id);
+    const newIndex = stories.findIndex((s) => s.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(stories, oldIndex, newIndex);
+    const otherOrders = reordered
+      .filter((s) => s.id !== active.id)
+      .map((s) => s.order);
+    const newOrder = calculateInsertOrder(otherOrders, newIndex);
+
+    setStories(reordered.map((s) => (s.id === active.id ? { ...s, order: newOrder } : s)));
+
+    void fetch(`/api/stories/${String(active.id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order: newOrder }),
+    });
+  }
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={stories.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+        {stories.map((story) => (
+          <SortableStoryItem
+            key={story.id}
+            story={story}
+            depth={depth}
+            isActive={activeId === story.id}
+            isExpanded={expandedIds.has(story.id)}
+            collapsed={collapsed}
+            onToggleExpanded={() => onToggleExpanded(story.id)}
+            onSetActive={() => onSetActive(story.id)}
+            onAddDocument={(e) => onAddDocument(e, story)}
+            onContextMenu={(e) => onContextMenu(e, story)}
+          >
+            {renderChildren(story)}
+          </SortableStoryItem>
+        ))}
+      </SortableContext>
+    </DndContext>
+  );
+}
+
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 
 interface SidebarProps {
@@ -1465,7 +1639,40 @@ export default function Sidebar({ mobileOpen, onMobileClose, displayName }: Side
               "series",
               series.subcategories,
             )}
-            {series.stories.map((s) => renderStoryNode(s, depth + 1))}
+            <SortableStoryList
+              stories={series.stories}
+              depth={depth + 1}
+              collapsed={collapsed}
+              activeId={activeId}
+              expandedIds={expanded}
+              onToggleExpanded={toggleExpanded}
+              onSetActive={setActiveId}
+              onAddDocument={(e, story) => {
+                e.stopPropagation();
+                setNewDocumentModal({ parentId: story.id, parentName: story.name, parentType: "story", storyMode: story.mode });
+              }}
+              onContextMenu={(e, story) =>
+                openContextMenu(e, story.id, "story", story.name, {
+                  seriesId: story.seriesId,
+                  universeId: story.universeId,
+                })
+              }
+              renderChildren={(story) => (
+                <ul>
+                  {renderDocumentSections(
+                    story.documents,
+                    depth + 2,
+                    story.id,
+                    "story",
+                    story.subcategories,
+                    `/dashboard/stories/${story.id}/map`,
+                    `Relationship Map for ${story.name}`,
+                    story.name,
+                    story.mode,
+                  )}
+                </ul>
+              )}
+            />
           </ul>
         )}
       </li>

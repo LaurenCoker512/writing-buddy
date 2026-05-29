@@ -29,12 +29,17 @@ export async function GET() {
     subcategories: subcategorySelect,
   };
 
+  const storyOrderBy = [
+    { order: "asc" as const },
+    { createdAt: "asc" as const },
+  ];
+
   const seriesInclude = {
     documents: documentSelect,
     subcategories: subcategorySelect,
     stories: {
       include: storyInclude,
-      orderBy: { createdAt: "asc" as const },
+      orderBy: storyOrderBy,
     },
   };
 
@@ -51,7 +56,7 @@ export async function GET() {
         stories: {
           where: { seriesId: null },
           include: storyInclude,
-          orderBy: { createdAt: "asc" },
+          orderBy: storyOrderBy,
         },
       },
       orderBy: { createdAt: "asc" },
@@ -64,7 +69,7 @@ export async function GET() {
     prisma.story.findMany({
       where: { userId, seriesId: null, universeId: null },
       include: storyInclude,
-      orderBy: { createdAt: "asc" },
+      orderBy: storyOrderBy,
     }),
   ]);
 
@@ -107,7 +112,7 @@ export async function GET() {
             stories: {
               where: { seriesId: null },
               include: storyInclude,
-              orderBy: { createdAt: "asc" },
+              orderBy: storyOrderBy,
             },
           },
           orderBy: { createdAt: "asc" },
@@ -120,7 +125,7 @@ export async function GET() {
         prisma.story.findMany({
           where: { userId, seriesId: null, universeId: null },
           include: storyInclude,
-          orderBy: { createdAt: "asc" },
+          orderBy: storyOrderBy,
         }),
       ]);
     return NextResponse.json({

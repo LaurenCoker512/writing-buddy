@@ -49,6 +49,9 @@ export async function PATCH(req: NextRequest, { params }: RouteParams<{ id: stri
     patchData.universeId =
       typeof body.universeId === "string" && body.universeId !== "" ? body.universeId : null;
   }
+  if (body.order !== undefined) {
+    patchData.order = typeof body.order === "number" ? body.order : null;
+  }
 
   if (Object.keys(patchData).length === 0) {
     return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });

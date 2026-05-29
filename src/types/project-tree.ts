@@ -20,6 +20,7 @@ export interface StoryItem {
   name: string;
   mode: string;
   rating: string;
+  order: number | null;
   seriesId: string | null;
   universeId: string | null;
   documents: DocumentItem[];
