@@ -1510,7 +1510,12 @@ export default function Sidebar({ mobileOpen, onMobileClose, displayName }: Side
             <ChevronIcon expanded={isExpanded} className="h-3 w-3" />
           </button>
           <button
-            onClick={() => setActiveId(story.id)}
+            onClick={() => {
+              setActiveId(story.id);
+              setExpanded((prev) => new Set(prev).add(story.id));
+              const plotDoc = story.documents.find((doc) => doc.type === "PLOT");
+              if (plotDoc) router.push(`/dashboard/documents/${plotDoc.id}`);
+            }}
             className="flex flex-1 items-center gap-1.5 truncate"
             data-testid={`story-node-${story.id}`}
             aria-label={story.name}
@@ -1594,7 +1599,10 @@ export default function Sidebar({ mobileOpen, onMobileClose, displayName }: Side
           <button
             onClick={() => {
               setActiveId(series.id);
-              if (hasChildren) toggleExpanded(series.id);
+              if (hasChildren) setExpanded((prev) => new Set(prev).add(series.id));
+              const firstStory = series.stories[0];
+              const plotDoc = firstStory?.documents.find((doc) => doc.type === "PLOT");
+              if (plotDoc) router.push(`/dashboard/documents/${plotDoc.id}`);
             }}
             className="flex flex-1 items-center gap-1.5 truncate"
             data-testid={`series-node-${series.id}`}
